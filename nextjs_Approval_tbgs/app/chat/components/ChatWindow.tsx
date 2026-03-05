@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Send, Paperclip, Smile, MoreHorizontal, Phone, Video, Search, MessageSquare, Check, CheckCheck, ChevronLeft, Download, File, FileText, Image as ImageIcon, X } from 'lucide-react';
+import { Send, Paperclip, Smile, MoreHorizontal, Phone, Video, Search, MessageSquare, Check, CheckCheck, ChevronLeft, Download, File, FileText, Image as ImageIcon, X, Trash2, DownloadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatMessageTime } from '../utils/time';
 import axios from 'axios';
@@ -38,21 +38,29 @@ interface ChatWindowProps {
     onTyping?: (isTyping: boolean) => void;
     isRecipientTyping?: boolean;
     onBack?: () => void;
+    onClearChat: () => void;
 }
 
-export default function ChatWindow({ recipient, currentUser, messages, onSendMessage, onTyping, isRecipientTyping, onBack }: ChatWindowProps) {
+export default function ChatWindow({ recipient, currentUser, messages, onSendMessage, onTyping, isRecipientTyping, onBack, onClearChat }: ChatWindowProps) {
     const [inputValue, setInputValue] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
+    const [isSearchVisible, setIsSearchVisible] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Grouping and Date logic
     const chatContent = useMemo(() => {
+        const filteredMessages = searchTerm
+            ? messages.filter(m => m.message.toLowerCase().includes(searchTerm.toLowerCase()))
+            : messages;
+
         const groups: any[] = [];
         let lastDate = "";
 
-        messages.forEach((msg, idx) => {
+        filteredMessages.forEach((msg, idx) => {
             const msgDate = new Date(msg.createdAt).toDateString();
 
             if (msgDate !== lastDate) {
@@ -61,9 +69,8 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                 lastDate = msgDate;
             }
 
-            const nextMsg = messages[idx + 1];
-            const isFirstInGroup = idx === 0 || messages[idx - 1].senderId !== msg.senderId || (new Date(msg.createdAt).getTime() - new Date(messages[idx - 1].createdAt).getTime() > 300000);
-            const isLastInGroup = !nextMsg || nextMsg.senderId !== msg.senderId || (new Date(nextMsg.createdAt).getTime() - new Date(msg.createdAt).getTime() > 300000);
+            const isFirstInGroup = idx === 0 || filteredMessages[idx - 1].senderId !== msg.senderId || (new Date(msg.createdAt).getTime() - new Date(filteredMessages[idx - 1].createdAt).getTime() > 300000);
+            const isLastInGroup = idx === filteredMessages.length - 1 || filteredMessages[idx + 1].senderId !== msg.senderId || (new Date(filteredMessages[idx + 1].createdAt).getTime() - new Date(msg.createdAt).getTime() > 300000);
 
             groups.push({
                 ...msg,
@@ -74,10 +81,24 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
         });
 
         return groups;
-    }, [messages]);
+    }, [messages, searchTerm]);
+
+    const getHighlightedText = (text: string, highlight: string) => {
+        if (!highlight.trim()) return text;
+        const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+        return (
+            <span>
+                {parts.map((part, i) => (
+                    <span key={i} className={part.toLowerCase() === highlight.toLowerCase() ? 'bg-yellow-200 text-slate-900 rounded-sm' : ''}>
+                        {part}
+                    </span>
+                ))}
+            </span>
+        );
+    };
 
     const scrollToBottom = (instant = false) => {
-        if (scrollRef.current) {
+        if (scrollRef.current && !searchTerm) {
             scrollRef.current.scrollTo({
                 top: scrollRef.current.scrollHeight,
                 behavior: instant ? 'auto' : 'smooth'
@@ -102,28 +123,14 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
         const file = e.target.files?.[0];
         if (!file) return;
 
-        setIsUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
+        // Immediate callback with the actual File object
+        onSendMessage('', {
+            fileObject: file,
+            fileName: file.name,
+            fileType: file.type
+        });
 
-        try {
-            const res = await axios.post('/api/chat/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-
-            // Send message with file data
-            onSendMessage('', {
-                fileUrl: res.data.fileUrl,
-                fileName: res.data.fileName,
-                fileType: res.data.fileType
-            });
-        } catch (err) {
-            console.error("Upload failed:", err);
-            alert("File upload failed. Please try again.");
-        } finally {
-            setIsUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -135,6 +142,42 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                 onTyping(false);
             }, 2000);
         }
+    };
+
+    const handleClearChat = async () => {
+        if (!recipient) return;
+        if (confirm(`Are you sure you want to clear all messages with ${recipient.name}? This cannot be undone.`)) {
+            try {
+                await axios.post('/api/chat/clear', {
+                    userId: currentUser.id,
+                    targetId: recipient.id
+                });
+                onClearChat();
+                setShowMenu(false);
+            } catch (err) {
+                console.error("Failed to clear chat:", err);
+                alert("Failed to clear chat. Please try again.");
+            }
+        }
+    };
+
+    const exportChat = () => {
+        if (!recipient || messages.length === 0) return;
+
+        const chatHeader = `Chat history with ${recipient.name}\nExported on: ${new Date().toLocaleString()}\n-------------------------------------------\n\n`;
+        const chatBody = messages.map(m => {
+            const time = new Date(m.createdAt).toLocaleString();
+            const sender = m.senderId === currentUser.id ? 'Me' : recipient.name;
+            return `[${time}] ${sender}: ${m.message || (m.fileUrl ? '[Attachment]' : '')}`;
+        }).join('\n');
+
+        const element = document.createElement("a");
+        const file = new Blob([chatHeader + chatBody], { type: 'text/plain' });
+        element.href = URL.createObjectURL(file);
+        element.download = `chat_with_${recipient.username}.txt`;
+        document.body.appendChild(element);
+        element.click();
+        setShowMenu(false);
     };
 
     if (!recipient) {
@@ -201,13 +244,107 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                     </div>
                 </div>
                 <div className="flex items-center space-x-1 sm:space-x-2 text-slate-400">
-                    {[Search, MoreHorizontal].map((Icon, i) => (
-                        <button key={i} className="p-2.5 hover:bg-slate-100 rounded-xl transition-all cursor-pointer hover:text-indigo-600 active:scale-90">
-                            <Icon size={18} strokeWidth={2.5} />
+                    <AnimatePresence>
+                        {isSearchVisible && (
+                            <motion.div
+                                initial={{ width: 0, opacity: 0 }}
+                                animate={{ width: 'auto', opacity: 1 }}
+                                exit={{ width: 0, opacity: 0 }}
+                                className="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-2 h-10 overflow-hidden"
+                            >
+                                <input
+                                    autoFocus
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search chat..."
+                                    className="bg-transparent border-none outline-none text-xs font-bold px-2 w-24 sm:w-40 text-slate-600 uppercase tracking-widest placeholder:text-slate-300"
+                                />
+                                <button
+                                    onClick={() => { setIsSearchVisible(false); setSearchTerm(''); }}
+                                    className="p-1 hover:bg-slate-200 rounded-lg transition-colors"
+                                >
+                                    <X size={14} className="text-slate-400" />
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <button
+                        onClick={() => setIsSearchVisible(!isSearchVisible)}
+                        className={`p-2.5 hover:bg-slate-100 rounded-xl transition-all cursor-pointer hover:text-indigo-600 active:scale-90 ${isSearchVisible ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : ''}`}
+                    >
+                        <Search size={18} strokeWidth={2.5} />
+                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowMenu(!showMenu)}
+                            className={`p-2.5 hover:bg-slate-100 rounded-xl transition-all cursor-pointer hover:text-indigo-600 active:scale-90 ${showMenu ? 'bg-slate-100 text-indigo-600' : ''}`}
+                        >
+                            <MoreHorizontal size={18} strokeWidth={2.5} />
                         </button>
-                    ))}
+
+                        <AnimatePresence>
+                            {showMenu && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                                        className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 overflow-hidden"
+                                    >
+                                        <div className="px-4 py-2 border-b border-slate-50">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Conversation Actions</p>
+                                        </div>
+                                        <button
+                                            onClick={exportChat}
+                                            className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                        >
+                                            <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                                                <DownloadCloud size={16} />
+                                            </div>
+                                            <span className="text-sm font-bold text-slate-700">Export Chat</span>
+                                        </button>
+                                        <button
+                                            onClick={handleClearChat}
+                                            className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-red-50 transition-colors text-left group"
+                                        >
+                                            <div className="p-1.5 rounded-lg bg-red-50 text-red-500 group-hover:bg-red-100">
+                                                <Trash2 size={16} />
+                                            </div>
+                                            <span className="text-sm font-bold text-red-600">Clear Chat</span>
+                                        </button>
+                                    </motion.div>
+                                </>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
             </div>
+
+            {/* Search Results Banner */}
+            <AnimatePresence>
+                {isSearchVisible && searchTerm && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+                            <span className="text-xs font-black text-indigo-500 tracking-widest uppercase">
+                                {chatContent.filter(i => i.type === 'message').length} result(s) for &quot;{searchTerm}&quot;
+                            </span>
+                            <button
+                                onClick={() => { setSearchTerm(''); setIsSearchVisible(false); }}
+                                className="text-[10px] font-black text-indigo-400 hover:text-indigo-600 uppercase tracking-widest"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Messages Area */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 pb-2 bg-[#F6F8FC] custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed">
@@ -274,7 +411,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
 
                                         {item.message && (
                                             <p className={`text-sm leading-relaxed whitespace-pre-wrap font-medium ${isImage ? 'px-2 py-1' : ''}`}>
-                                                {item.message}
+                                                {getHighlightedText(item.message, searchTerm)}
                                             </p>
                                         )}
 

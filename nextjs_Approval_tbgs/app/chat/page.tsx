@@ -207,15 +207,21 @@ export default function ChatPage() {
         const contactId = Number(selectedUserId);
         const tempId = Date.now();
 
+        // Handle File Upload Optimistically
+        let localFileUrl = fileData?.fileUrl;
+        if (fileData?.fileObject) {
+            localFileUrl = URL.createObjectURL(fileData.fileObject);
+        }
+
         const optimisticMsg = {
             id: tempId,
             senderId: myId,
             receiverId: contactId,
             message: text,
-            fileUrl: fileData?.fileUrl,
+            fileUrl: localFileUrl,
             fileName: fileData?.fileName,
             fileType: fileData?.fileType,
-            createdAt: new Date().toISOString(),
+            createdAt: new Date(), // Using Date object for local consistency
             isSending: true,
             isRead: false
         };
@@ -223,12 +229,36 @@ export default function ChatPage() {
         setMessages(prev => [...prev, optimisticMsg]);
 
         try {
+            let finalFileData = { ...fileData };
+
+            // 1. Perform Upload if there's a file
+            if (fileData?.fileObject) {
+                const formData = new FormData();
+                formData.append('file', fileData.fileObject);
+                const uploadRes = await axios.post('/api/chat/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                finalFileData = {
+                    fileUrl: uploadRes.data.fileUrl,
+                    fileName: uploadRes.data.fileName,
+                    fileType: uploadRes.data.fileType
+                };
+            }
+
+            // 2. Persist Message
             const res = await axios.post('/api/chat/messages', {
                 senderId: myId,
                 receiverId: contactId,
                 message: text,
-                ...fileData
+                fileUrl: finalFileData.fileUrl,
+                fileName: finalFileData.fileName,
+                fileType: finalFileData.fileType
             });
+
+            // 3. Clean up the local blob URL if we created one
+            if (fileData?.fileObject && localFileUrl) {
+                URL.revokeObjectURL(localFileUrl);
+            }
 
             if (socket) {
                 socket.emit('send-message', res.data);
@@ -245,13 +275,17 @@ export default function ChatPage() {
                 u.id === contactId ? {
                     ...u,
                     lastMessage: text,
-                    lastMessageTime: new Date().toISOString(),
-                    lastFileUrl: fileData?.fileUrl,
-                    lastFileType: fileData?.fileType
+                    lastMessageTime: new Date(),
+                    lastFileUrl: finalFileData.fileUrl,
+                    lastFileType: finalFileData.fileType
                 } : u
             ));
         } catch (err) {
             console.error("Error sending message:", err);
+            // If upload fails and we had a local URL, clean it up
+            if (fileData?.fileObject && localFileUrl) {
+                URL.revokeObjectURL(localFileUrl);
+            }
             setMessages(prev => prev.filter(m => m.id !== tempId));
         }
     };
@@ -291,6 +325,12 @@ export default function ChatPage() {
                     messages={messages}
                     onSendMessage={handleSendMessage}
                     onTyping={handleTyping}
+                    onClearChat={() => {
+                        setMessages([]);
+                        setUsers(prev => prev.map(u =>
+                            u.id === selectedUserId ? { ...u, lastMessage: null, lastMessageTime: null } : u
+                        ));
+                    }}
                     isRecipientTyping={isTyping}
                     onBack={() => setSelectedUserId(null)}
                 />

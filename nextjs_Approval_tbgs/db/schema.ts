@@ -324,13 +324,13 @@ export const chatMessages = pgTable("tbl_chat_messages", {
   fileName: varchar("file_name", { length: 255 }),
   fileType: varchar("file_type", { length: 100 }),
   isRead: boolean("is_read").default(false),
-  createdAt: timestamp("created_at", { withTimezone: false }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const userStatus = pgTable("tbl_user_status", {
   userId: integer("user_id").primaryKey().references(() => users.id),
   isOnline: boolean("is_online").default(false),
-  lastSeen: timestamp("last_seen", { withTimezone: false }).defaultNow(),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).defaultNow(),
 });
 
 // -------------------- Relations --------------------
