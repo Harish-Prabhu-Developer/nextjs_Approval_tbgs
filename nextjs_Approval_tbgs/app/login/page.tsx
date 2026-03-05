@@ -5,70 +5,41 @@ import { Lock, ArrowRight, Github, Chrome, LogIn, User, Eye, EyeOff, Loader } fr
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import { loginUser } from "@/redux/slices/authSlice";
+
 export default function LoginPage() {
     const router = useRouter();
+    const dispatch = useAppDispatch();
+    const { loading, error: authError, isAuthenticated } = useAppSelector((state) => state.auth);
+
     const [username, setUserName] = useState("");
     const [password, setPassword] = useState("");
-    const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
-    const [error, setError] = useState("");
 
     // Redirect if already logged in
     useEffect(() => {
-        const token = localStorage.getItem("tbgs_access_token");
-        if (token) {
+        if (isAuthenticated) {
             router.push("/dashboard");
         }
-    }, [router]);
+    }, [isAuthenticated, router]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError("");
 
         if (!username || !password) {
             toast.error("Please fill in all fields");
-            setError("Please fill in all fields");
             return;
         }
 
-        setLoading(true);
+        const result = await dispatch(loginUser({ username, password }));
 
-        try {
-            // Mock Login Implementation
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            // Import MOCK_USERS dynamically or assume it's available via import
-            const { MOCK_USERS } = require("../config/mockData");
-
-            const foundUser = MOCK_USERS.find((u: any) =>
-                u.username.toLowerCase() === username.toLowerCase() &&
-                u.password === password
-            );
-
-            if (foundUser) {
-                const mockToken = `mock_tbgs_access_token_${foundUser.id}`;
-
-                // Success
-                toast.success(`Welcome back ${foundUser.name}! Redirecting...`);
-
-                // Store token and user data
-                localStorage.setItem("tbgs_access_token", mockToken);
-                localStorage.setItem("tbgs_user", JSON.stringify(foundUser));
-
-                // Redirect to dashboard
-                router.push("/dashboard");
-            } else {
-                toast.error("Invalid credentials. Use '123' as password.");
-                setError("Invalid username or password");
-            }
-
-        } catch (err: any) {
-            console.error("Login Error:", err);
-            setError("Something went wrong");
-            toast.error("Something went wrong");
-        } finally {
-            setLoading(false);
+        if (loginUser.fulfilled.match(result)) {
+            toast.success(`Welcome back! Redirecting...`);
+            router.push("/dashboard");
+        } else {
+            toast.error(result.payload as string || "Login failed");
         }
     };
 
@@ -175,9 +146,9 @@ export default function LoginPage() {
                         </button>
 
                         {/* Error Message */}
-                        {error && (
+                        {authError && (
                             <div className="bg-red-50 text-red-600 text-sm font-semibold py-3 px-4 rounded-xl text-center border border-red-100">
-                                {error}
+                                {authError}
                             </div>
                         )}
                     </form>

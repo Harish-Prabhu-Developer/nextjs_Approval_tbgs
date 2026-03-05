@@ -2,19 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, Text, TextInput, View } from 'react-native';
 import { Check, CheckCircle2, Eye, EyeOff, Info, Loader, Lock, LogIn, User, XCircle } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MOCK_USERS } from '../data/mockData';
 import { StatusBar } from 'expo-status-bar';
-
-interface LoginScreenProps {
-    onLogin: (rememberMe: boolean) => Promise<void> | void;
-}
+import { useAppDispatch } from '../redux/hooks';
+import { loginUser } from '../redux/slices/authSlice';
+import { REMEMBERED_USERNAME_KEY, REMEMBER_ME_KEY } from '../constants/storage';
 
 type ToastType = 'success' | 'error' | 'info';
-const REMEMBER_ME_KEY = 'tbgs_remember_me';
-const REMEMBERED_USERNAME_KEY = 'tbgs_remembered_username';
-const USER_DATA_KEY = 'tbgs_user';
 
-export default function LoginScreen({ onLogin }: LoginScreenProps) {
+export default function LoginScreen() {
+    const dispatch = useAppDispatch();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -133,46 +129,23 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         }
 
         setLoading(true);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+            const result = await dispatch(
+                loginUser({
+                    username: username.trim(),
+                    password,
+                    rememberMe,
+                }),
+            ).unwrap();
 
-        const foundUser = (
-            MOCK_USERS as Array<{
-                id: number;
-                username: string;
-                password: string;
-                name: string;
-                role: string;
-                email: string;
-                permissions: string[];
-            }>
-        ).find(
-            (user) => user.username.toLowerCase() === username.trim().toLowerCase() && user.password === password,
-        );
-
-        if (!foundUser) {
-            setError('Invalid username or password');
-            showToast("Invalid credentials. Use '123' as password.", 'error');
+            showToast(`Welcome back ${result.user.name}! Redirecting...`, 'success');
+        } catch (err: any) {
+            const message = err?.message || err || 'Invalid username or password';
+            setError(String(message));
+            showToast(String(message), 'error');
+        } finally {
             setLoading(false);
-            return;
         }
-
-        if (rememberMe) {
-            await Promise.all([
-                AsyncStorage.setItem(REMEMBER_ME_KEY, 'true'),
-                AsyncStorage.setItem(REMEMBERED_USERNAME_KEY, foundUser.username),
-                AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(foundUser)),
-            ]);
-        } else {
-            await Promise.all([
-                AsyncStorage.setItem(REMEMBER_ME_KEY, 'false'),
-                AsyncStorage.removeItem(REMEMBERED_USERNAME_KEY),
-                AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(foundUser)),
-            ]);
-        }
-
-        showToast(`Welcome back ${foundUser.name}! Redirecting...`, 'success');
-        setLoading(false);
-        await onLogin(rememberMe);
     };
 
     const toastStyles =

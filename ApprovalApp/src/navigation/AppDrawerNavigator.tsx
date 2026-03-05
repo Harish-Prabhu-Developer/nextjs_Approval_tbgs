@@ -1,32 +1,24 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Alert, Image, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { DrawerContentComponentProps, DrawerContentScrollView, createDrawerNavigator, useDrawerStatus } from '@react-navigation/drawer';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Bell, BriefcaseBusiness, LayoutDashboard, LogOut, Menu, ShoppingCart, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Breadcrumbs from '../components/Breadcrumbs';
 
-import { DASHBOARD_CARDS, MOCK_COUNTS } from '../data/mockData';
+import { DASHBOARD_CARDS } from '../data/mockData';
 import DashboardScreen from '../Screens/DashboardScreen';
 import ApprovalScreen from '../Screens/ApprovalScreen';
 import { DrawerParamList } from './types';
 import ViewDetailScreen from '../Screens/ViewDetailScreen';
+import { useAppDispatch, useAppSelector } from '../redux/hooks';
+import { fetchApprovalCounts } from '../redux/slices/dashboardSlice';
+import { logoutUser } from '../redux/slices/authSlice';
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
-const USER_DATA_KEY = 'tbgs_user';
-
-interface AppDrawerNavigatorProps {
-  onLogout: () => void;
-}
-
-type StoredUser = {
-  name?: string;
-  permissions?: string[];
-};
 
 type DrawerMenuItem = {
   key: keyof DrawerParamList;
@@ -88,9 +80,14 @@ const MODULE_CONFIGS: ModuleConfig[] = [
 ];
 
 function SidebarContent(
-  props: DrawerContentComponentProps & { onLogout: () => void; allowedPermissions: string[]; userName: string },
+  props: DrawerContentComponentProps & {
+    onLogout: () => void;
+    allowedPermissions: string[];
+    userName: string;
+    counts: Record<string, number>;
+  },
 ) {
-  const { navigation, state, onLogout, allowedPermissions, userName } = props;
+  const { navigation, state, onLogout, allowedPermissions, userName, counts } = props;
   const insets = useSafeAreaInsets();
   const drawerStatus = useDrawerStatus();
   const isDrawerOpen = drawerStatus === 'open';
@@ -103,6 +100,12 @@ function SidebarContent(
     });
   }, [isDrawerOpen]);
 
+  const getPendingCount = (permissionColumn: string, routeSlug: string) => {
+    const permissionCount = Number(counts?.[permissionColumn] ?? 0);
+    const routeCount = Number(counts?.[routeSlug] ?? 0);
+    return Math.max(permissionCount, routeCount);
+  };
+
   const menuItems: DrawerMenuItem[] = [
     {
       key: 'Dashboard',
@@ -113,7 +116,7 @@ function SidebarContent(
     ...DASHBOARD_CARDS.filter((card) => allowedPermissions.includes(card.permissionColumn)).map((card) => ({
       key: routeMap[card.routeSlug] || 'Dashboard',
       label: card.cardTitle,
-      count: MOCK_COUNTS[card.permissionColumn] || 0,
+      count: getPendingCount(card.permissionColumn, card.routeSlug),
       icon: iconMap[card.iconKey] || LayoutDashboard,
     })),
   ];
@@ -210,29 +213,20 @@ function SidebarContent(
   );
 }
 
-export default function AppDrawerNavigator({ onLogout }: AppDrawerNavigatorProps) {
+export default function AppDrawerNavigator() {
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const { counts } = useAppSelector((state) => state.dashboard);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const permanent = width >= 1024;
-  const [userName, setUserName] = useState('User');
-  const [allowedPermissions, setAllowedPermissions] = useState<string[]>([]);
-
-  const hydrateCurrentUser = useCallback(async () => {
-    try {
-      const rawUser = await AsyncStorage.getItem(USER_DATA_KEY);
-      const parsedUser: StoredUser | null = rawUser ? JSON.parse(rawUser) : null;
-      setUserName(parsedUser?.name || 'User');
-      setAllowedPermissions(parsedUser?.permissions || []);
-    } catch {
-      setUserName('User');
-      setAllowedPermissions([]);
-    }
-  }, []);
+  const userName = user?.name || 'User';
+  const allowedPermissions = user?.permissions || [];
 
   useFocusEffect(
     useCallback(() => {
-      void hydrateCurrentUser();
-    }, [hydrateCurrentUser]),
+      dispatch(fetchApprovalCounts());
+    }, [dispatch]),
   );
 
   const allowedModules = useMemo(
@@ -251,9 +245,12 @@ export default function AppDrawerNavigator({ onLogout }: AppDrawerNavigatorProps
         >
           <SidebarContent
             {...props}
-            onLogout={onLogout}
+            onLogout={() => {
+              dispatch(logoutUser());
+            }}
             allowedPermissions={allowedPermissions}
             userName={userName}
+            counts={counts}
           />
         </LinearGradient>
       )}

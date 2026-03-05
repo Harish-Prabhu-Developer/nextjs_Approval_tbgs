@@ -1,11 +1,12 @@
 "use client";
 //app/[approvalType]/[id]/page.tsx
 import React, { useEffect, useState } from "react";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { Download, Printer, Mail, Calendar, FileText, CheckCircle, Clock, AlertCircle, ArrowLeft, Share2, Tag } from "lucide-react";
+import { useRouter, useParams } from "next/navigation";
+import { Download, AlertCircle, ArrowLeft, Loader2, FileText } from "lucide-react";
 
-// Mock data
 import { DASHBOARD_CARDS } from "../../config/mockData";
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import { fetchApprovalDetail, clearCurrentRecord } from "@/redux/slices/approvalSlice";
 
 interface ViewDetailPageProps {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -14,14 +15,17 @@ interface ViewDetailPageProps {
 const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
     const router = useRouter();
     const params = useParams();
+    const dispatch = useAppDispatch();
+
     const approvalType = params.approvalType as string;
     const id = params.id as string;
+
+    const { currentRecord: rowData, loading } = useAppSelector((state: any) => state.approval);
 
     // Get query parameters
     const [queryParams, setQueryParams] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        // Convert Promise to actual values
         searchParams.then((params) => {
             const paramsObj: Record<string, string> = {};
             Object.entries(params).forEach(([key, value]) => {
@@ -33,55 +37,20 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
         });
     }, [searchParams]);
 
-    const [rowData, setRowData] = React.useState<any>(null);
-    const [loading, setLoading] = React.useState(true);
+    useEffect(() => {
+        if (approvalType && id) {
+            dispatch(fetchApprovalDetail({ type: approvalType, id }));
+        }
 
-    React.useEffect(() => {
-        // Fetch data based on id and approvalType
-        const fetchData = async () => {
-            try {
-                // Replace with actual API call
-                // const response = await fetch(`/api/approval/${approvalType}/${id}`);
-                // const data = await response.json();
-
-                // Mock data for now
-                const mockData = {
-                    id: id,
-                    poNo: `PO-${id}`,
-                    poType: "DOMESTIC",
-                    cell: "A1",
-                    company: "AZ",
-                    department: "ATOZ 1 DEPT",
-                    currency: "TSH",
-                    amount: "29,500",
-                    pendingDays: "0",
-                    supplier: "ADDAMO MARINA HARDWARE",
-                    product: "RED SILICON B50/PC",
-                    requestedBy: "raw / 07-Jan-2026",
-                    response1Person: "Mr. Kalpesh",
-                    response1Status: "APPROVED",
-                    response1Remarks: "Quality checked",
-                    response2Person: "Shaaf",
-                    response2Status: "PENDING",
-                    response2Remarks: "",
-                    finalStatus: "HOLD",
-                };
-
-                setRowData(mockData);
-            } catch (error) {
-                console.error("Failed to fetch data:", error);
-            } finally {
-                setLoading(false);
-            }
+        return () => {
+            dispatch(clearCurrentRecord());
         };
-
-        fetchData();
-    }, [id, approvalType]);
+    }, [dispatch, approvalType, id]);
 
     // Format currency amount
-    const formatAmount = (amount: string, currency: string) => {
-        if (!amount) return "N/A";
-        return `${amount} ${currency}`;
+    const formatAmount = (amount: any, currency: string) => {
+        if (amount === undefined || amount === null) return "N/A";
+        return `${Number(amount).toLocaleString()} ${currency || ''}`;
     };
 
     // Get status badge styling
@@ -92,90 +61,73 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
 
         switch (statusText.toUpperCase()) {
             case "APPROVED":
-                bgColor = "bg-green-100";
+                bgColor = "bg-green-100 uppercase";
                 textColor = "text-green-800";
                 break;
             case "HOLD":
-                bgColor = "bg-yellow-100";
+                bgColor = "bg-yellow-100 uppercase";
                 textColor = "text-yellow-800";
                 break;
             case "REJECTED":
-                bgColor = "bg-red-100";
+                bgColor = "bg-red-100 uppercase";
                 textColor = "text-red-800";
                 break;
-            case "IN PROGRESS":
-                bgColor = "bg-blue-100";
-                textColor = "text-blue-800";
-                break;
             default:
-                bgColor = "bg-gray-100";
+                bgColor = "bg-gray-100 uppercase";
                 textColor = "text-gray-800";
         }
 
         return (
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor}`}>
+            <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider ${bgColor} ${textColor}`}>
                 {statusText}
             </span>
         );
     };
 
-    // Action buttons
-    const actionButtons = [
-        {
-            label: "Download",
-            icon: <Download className="w-4 h-4" />,
-            onClick: () => console.log("Download PO", rowData?.poNo),
-            variant: "outline" as const
-        },
-    ];
-
-    // Main details sections
+    // Details sections setup
     const detailSections = [
         {
-            title: "Purchase Order Information",
+            title: `${pageTitle || 'Request'} Information`,
             items: [
-                { label: "PO Number", value: rowData?.poNo || "N/A" },
-                { label: "PO Type", value: rowData?.poType || "N/A" },
+                { label: "Reference Number", value: rowData?.poRefNo || "N/A" },
+                { label: "Type", value: rowData?.purchaseType || "N/A" },
                 { label: "Cell", value: rowData?.cell || "N/A" },
-                { label: "Company", value: rowData?.company || "N/A" },
-                { label: "Department", value: rowData?.department || "N/A" },
-                { label: "Currency", value: rowData?.currency || "N/A" },
-                { label: "PO Amount", value: formatAmount(rowData?.amount, rowData?.currency) },
-                { label: "Pending Days", value: `${rowData?.pendingDays || "0"} days` },
+                { label: "Company", value: rowData?.companyId?.toString() || "N/A" },
+                { label: "Department", value: rowData?.poStoreId?.toString() || "N/A" },
+                { label: "Currency", value: rowData?.currencyType || "N/A" },
+                { label: "Total Amount", value: formatAmount(rowData?.totalFinalProductionHdrAmount, rowData?.currencyType) },
+                { label: "Created Date", value: rowData?.createdDate || "N/A" },
             ]
         },
         {
-            title: "Supplier & Product Details",
+            title: "Supplier & Request Details",
             items: [
-                { label: "Supplier", value: rowData?.supplier || "N/A" },
-                { label: "Top Product", value: rowData?.product || "N/A" },
+                { label: "Supplier ID", value: rowData?.supplierId?.toString() || "N/A" },
                 { label: "Requested By", value: rowData?.requestedBy || "N/A" },
-                { label: "Request Date", value: rowData?.requestedBy?.split("/")[1]?.trim() || "N/A" },
+                { label: "Requested Date", value: rowData?.requestedDate || "N/A" },
             ]
         }
     ];
 
-    // Approval details sections
     const approvalSections = [
         {
-            title: "First Approval",
+            title: "First Approval Workflow",
             items: [
-                { label: "Approver", value: rowData?.response1Person || "Not Assigned" },
+                { label: "Authority", value: rowData?.response1Person || "Not Assigned" },
                 { label: "Status", value: rowData?.response1Status || "PENDING", isStatus: true },
                 { label: "Remarks", value: rowData?.response1Remarks || "No remarks provided" },
             ]
         },
         {
-            title: "Second Approval",
+            title: "Second Approval Workflow",
             items: [
-                { label: "Approver", value: rowData?.response2Person || "Not Assigned" },
+                { label: "Authority", value: rowData?.response2Person || "Not Assigned" },
                 { label: "Status", value: rowData?.response2Status || "PENDING", isStatus: true },
                 { label: "Remarks", value: rowData?.response2Remarks || "No remarks provided" },
             ]
         }
     ];
 
-    // Get page title from query params or route
     const pageTitle = React.useMemo(() => {
         if (queryParams.cardTitle) return queryParams.cardTitle;
         const card = DASHBOARD_CARDS.find(c => c.routeSlug === approvalType);
@@ -185,10 +137,10 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading details...</p>
+                    <Loader2 className="animate-spin h-10 w-10 text-indigo-600 mx-auto mb-4" />
+                    <p className="text-slate-600 font-bold uppercase text-[12px] tracking-widest">Loading Detailed Analysis...</p>
                 </div>
             </div>
         );
@@ -196,19 +148,21 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
 
     if (!rowData) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="bg-white rounded-lg shadow-sm p-8 max-w-md text-center">
-                    <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-                    <h2 className="text-xl font-semibold text-gray-900 mb-2">Data Not Found</h2>
-                    <p className="text-gray-600 mb-6">
-                        The requested details could not be found. Please go back and try again.
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+                <div className="bg-white rounded-3xl shadow-xl p-10 max-w-md w-full text-center border border-slate-100">
+                    <div className="w-20 h-20 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <AlertCircle className="w-10 h-10 text-rose-500" />
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">Data Not Found</h2>
+                    <p className="text-slate-500 mb-8 font-medium">
+                        The requested approval record <span className="text-indigo-600 font-bold">#{id}</span> could not be retrieved from the vault.
                     </p>
                     <button
                         onClick={() => router.back()}
-                        className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center justify-center mx-auto"
+                        className="w-full py-4 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100 active:scale-95 transition-all"
                     >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Go Back
+                        <ArrowLeft className="w-4 h-4 mr-2" strokeWidth={3} />
+                        Return to List
                     </button>
                 </div>
             </div>
@@ -216,96 +170,84 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-slate-50/50 pb-12 animate-in fade-in duration-500">
             {/* Page Header */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            {rowData.poNo}
+            <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <div className="space-y-2">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                            <FileText size={20} />
+                        </div>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                            {rowData.poRefNo}
                         </h1>
-                        <p className="text-gray-600 mt-1">
-                            {pageTitle} • ID: {rowData.id} • {getStatusBadge(rowData.finalStatus)}
-                        </p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <button
-                            onClick={() => router.back()}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg flex items-center"
-                        >
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            Back
-                        </button>
-                        {/* {actionButtons.map((button, index) => (
-                            <button
-                                key={index}
-                                onClick={button.onClick}
-                                className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center space-x-2 ${button.variant === "outline"
-                                    ? "border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                    : "bg-indigo-600 text-white hover:bg-indigo-700"
-                                    }`}
-                            >
-                                {button.icon}
-                                <span>{button.label}</span>
-                            </button>
-                        ))} */}
+                    <div className="flex items-center flex-wrap gap-2 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
+                        <span>{pageTitle}</span>
+                        <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                        <span>SNO: {rowData.sno}</span>
+                        <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                        {getStatusBadge(rowData.finalResponseStatus || 'PENDING')}
                     </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                    <button
+                        onClick={() => router.back()}
+                        className="px-6 py-3 text-xs font-black text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-all flex items-center shadow-sm active:scale-95"
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2" strokeWidth={3} />
+                        BACK TO LIST
+                    </button>
+                    <button className="px-6 py-3 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all flex items-center shadow-lg shadow-indigo-100 active:scale-95">
+                        <Download className="w-4 h-4 mr-2" strokeWidth={3} />
+                        DOWNLOAD PO
+                    </button>
                 </div>
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* Purchase Order Details */}
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                    <div className="border-b border-gray-200 px-6 py-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Purchase Order Details</h3>
-                    </div>
-                    <div className="p-6">
-                        <div className="space-y-4">
-                            {detailSections[0].items.map((item, index) => (
-                                <div key={index} className="flex justify-between items-center py-2">
-                                    <span className="text-sm text-gray-600">{item.label}</span>
-                                    <span className="text-sm font-medium text-gray-900 text-right">{item.value}</span>
-                                </div>
-                            ))}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                {detailSections.map((section, idx) => (
+                    <div key={idx} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                        <div className="bg-slate-50/50 px-8 py-5 border-b border-slate-100">
+                            <h3 className="text-[13px] font-black text-slate-800 uppercase tracking-widest">{section.title}</h3>
+                        </div>
+                        <div className="p-8 flex-1">
+                            <div className="grid grid-cols-1 gap-y-4">
+                                {section.items.map((item, index) => (
+                                    <div key={index} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 group">
+                                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-indigo-400 transition-colors">{item.label}</span>
+                                        <span className="text-[14px] font-bold text-slate-800 text-right">{item.value}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                {/* Supplier & Product Details */}
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                    <div className="border-b border-gray-200 px-6 py-4">
-                        <h3 className="text-lg font-semibold text-gray-900">Supplier & Product</h3>
-                    </div>
-                    <div className="p-6">
-                        <div className="space-y-4">
-                            {detailSections[1].items.map((item, index) => (
-                                <div key={index} className="flex justify-between items-center py-2">
-                                    <span className="text-sm text-gray-600">{item.label}</span>
-                                    <span className="text-sm font-medium text-gray-900 text-right">{item.value}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                ))}
             </div>
 
             {/* Approval Details Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {approvalSections.map((section, sectionIndex) => (
-                    <div key={sectionIndex} className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                        <div className="border-b border-gray-200 px-6 py-4">
-                            <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
+                    <div key={sectionIndex} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                        <div className="bg-indigo-50/30 px-8 py-5 border-b border-slate-100 flex items-center space-x-2">
+                            <div className="w-5 h-5 rounded-md bg-indigo-600 text-[10px] font-black text-white flex items-center justify-center">0{sectionIndex + 1}</div>
+                            <h3 className="text-[13px] font-black text-slate-800 uppercase tracking-widest">{section.title}</h3>
                         </div>
-                        <div className="p-6">
-                            <div className="space-y-4">
+                        <div className="p-8">
+                            <div className="grid grid-cols-1 gap-y-6">
                                 {section.items.map((item, itemIndex) => (
                                     <div key={itemIndex}>
-                                        <div className="text-xs text-gray-500 mb-1">{item.label}</div>
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">{item.label}</div>
                                         {item.isStatus ? (
-                                            <div className="mb-3">{getStatusBadge(item.value)}</div>
+                                            <div className="inline-block">{getStatusBadge(item.value)}</div>
                                         ) : (
-                                            <div className={`text-sm ${item.label === "Remarks" ? "italic text-gray-700 bg-gray-50 p-3 rounded" : "font-medium text-gray-900"}`}>
+                                            <div className={`
+                                                p-4 rounded-2xl transition-all
+                                                ${item.label === "Remarks"
+                                                    ? "italic bg-slate-50 border border-slate-100 text-slate-600 font-medium text-[13px]"
+                                                    : "bg-white text-slate-800 font-bold text-[15px] p-0"}
+                                            `}>
                                                 {item.value}
                                             </div>
                                         )}

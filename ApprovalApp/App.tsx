@@ -1,50 +1,25 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Provider } from 'react-redux';
 import './global.css';
 import RootNavigator from './src/navigation/RootNavigator';
+import { store } from './src/redux/store';
+import { useAppDispatch, useAppSelector } from './src/redux/hooks';
+import { hydrateAuth } from './src/redux/slices/authSlice';
 
-const ACCESS_TOKEN_KEY = 'tbgs_access_token';
-const USER_DATA_KEY = 'tbgs_user';
-
-const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isBooting, setIsBooting] = useState(true);
+function AppContent() {
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, hydrated } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
-    const bootstrapAuth = async () => {
-      try {
-        const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-        setIsLoggedIn(Boolean(token));
-      } catch (e) {
-        console.error('Failed to load session', e);
-      } finally {
-        setIsBooting(false);
-      }
-    };
-    bootstrapAuth();
-  }, []);
+    dispatch(hydrateAuth());
+  }, [dispatch]);
 
-  const handleLogin = async (rememberMe: boolean) => {
-    // Mock token generation
-    await AsyncStorage.setItem(ACCESS_TOKEN_KEY, `mock_tbgs_access_token_${Date.now()}`);
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = async () => {
-    await Promise.all([
-      AsyncStorage.removeItem(ACCESS_TOKEN_KEY),
-      AsyncStorage.removeItem(USER_DATA_KEY),
-      AsyncStorage.removeItem('tbgs_remember_me'),
-    ]);
-    setIsLoggedIn(false);
-  };
-
-  if (isBooting) {
+  if (!hydrated) {
     return (
       <SafeAreaProvider>
         <View className="flex-1 items-center justify-center bg-slate-50">
@@ -59,15 +34,17 @@ const App = () => {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer>
-          <RootNavigator
-            isLoggedIn={isLoggedIn}
-            onLogin={handleLogin}
-            onLogout={handleLogout}
-          />
+          <RootNavigator isLoggedIn={isAuthenticated} />
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
-};
+}
 
-export default App;
+export default function App() {
+  return (
+    <Provider store={store}>
+      <AppContent />
+    </Provider>
+  );
+}

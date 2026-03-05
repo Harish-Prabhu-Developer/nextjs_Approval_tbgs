@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import StoreProvider from "./StoreProvider";
 
 export const metadata: Metadata = {
   title: "VIT Admin Hub",
@@ -20,8 +21,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
       </head>
       <body className="antialiased font-['Poppins',sans-serif]">
-        {children}
-        <Toaster position="top-center" />
+        <StoreProvider>
+          {children}
+          <Toaster position="top-center" />
+        </StoreProvider>
       </body>
     </html>
   );

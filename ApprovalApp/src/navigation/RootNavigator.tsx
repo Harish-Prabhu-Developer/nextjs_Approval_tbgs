@@ -9,21 +9,15 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 interface RootNavigatorProps {
   isLoggedIn: boolean;
-  onLogin: (rememberMe: boolean) => Promise<void>;
-  onLogout: () => Promise<void>;
 }
 
-export default function RootNavigator({ isLoggedIn, onLogin, onLogout }: RootNavigatorProps) {
+export default function RootNavigator({ isLoggedIn }: RootNavigatorProps) {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!isLoggedIn ? (
-        <Stack.Screen name="Login">
-          {() => <LoginScreen onLogin={onLogin} />}
-        </Stack.Screen>
+        <Stack.Screen name="Login" component={LoginScreen} />
       ) : (
-        <Stack.Screen name="App">
-          {() => <AppDrawerNavigator onLogout={onLogout} />}
-        </Stack.Screen>
+        <Stack.Screen name="App" component={AppDrawerNavigator} />
       )}
     </Stack.Navigator>
   );

@@ -3,75 +3,50 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 import DashboardCard from "../components/DashboardCard";
 
-import { DASHBOARD_CARDS, MOCK_COUNTS } from "../config/mockData";
-
-const MOCK_CARDS = DASHBOARD_CARDS;
-const MOCK_COUNTS_DATA = MOCK_COUNTS;
+import { DASHBOARD_CARDS } from "../config/mockData";
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import { fetchApprovalCounts } from "@/redux/slices/dashboardSlice";
 
 const DashboardPage = () => {
     const router = useRouter();
+    const dispatch = useAppDispatch();
+
+    const { user } = useAppSelector((state: any) => state.auth);
+    const { counts, loading } = useAppSelector((state: any) => state.dashboard);
+
     const [cards, setCards] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [approvalCounts, setApprovalCounts] = useState<Record<string, number>>({});
 
-    useEffect(() => {
-        fetchDashboardData();
-    }, []);
-
-    const fetchDashboardData = async () => {
-        try {
-            setLoading(true);
-            await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate delay
-
-            // Get user permissions
-            const userStr = localStorage.getItem("tbgs_user");
-            let allowedPermissions: string[] = [];
-
-            if (userStr) {
-                const user = JSON.parse(userStr);
-                allowedPermissions = user.permissions || [];
-            }
-
-            // Filter cards based on permissions
-            const filteredCards = MOCK_CARDS.filter((card: any) =>
-                allowedPermissions.includes(card.permissionColumn)
-            );
-
-            setCards(filteredCards as any);
-            setApprovalCounts(MOCK_COUNTS_DATA);
-        } catch (error) {
-            console.error("Failed to load dashboard data:", error);
-            toast.error("Failed to load dashboard data");
-        } finally {
-            setLoading(false);
-        }
+    const getPendingCount = (card: any) => {
+        const permissionCount = Number(counts?.[card.permissionColumn] ?? 0);
+        const routeCount = Number(counts?.[card.routeSlug] ?? 0);
+        const approvalTypeCount = Number(counts?.[card.approvalType] ?? 0);
+        return Math.max(permissionCount, routeCount, approvalTypeCount);
     };
 
-    const handleCardClick = (card: any) => {
-        const pendingCount = approvalCounts[card.permissionColumn] || 0;
-
-        if (pendingCount > 0) {
-            router.push(`/${card.routeSlug}`);
-        } else {
-            toast.error(`No pending requests for ${card.cardTitle}`);
+    useEffect(() => {
+        if (user) {
+            const filteredCards = DASHBOARD_CARDS.filter((card: any) =>
+                user.permissions?.includes(card.permissionColumn)
+            );
+            setCards(filteredCards as any);
         }
+    }, [user]);
+
+    useEffect(() => {
+        dispatch(fetchApprovalCounts());
+    }, [dispatch]);
+
+    const handleCardClick = (card: any) => {
+        router.push(`/${card.routeSlug}`);
     };
 
     const handleRefresh = async () => {
-        try {
-            setLoading(true);
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            setApprovalCounts(MOCK_COUNTS_DATA); // Use mock counts
-            toast.success('Dashboard refreshed successfully');
-        } catch (error) {
-            toast.error('Failed to refresh dashboard');
-        } finally {
-            setLoading(false);
-        }
+        dispatch(fetchApprovalCounts());
+        toast.success('Dashboard refreshed successfully');
     };
 
     if (loading && cards.length === 0) {
@@ -86,12 +61,11 @@ const DashboardPage = () => {
         );
     }
 
-    // Merge approval counts with cards and ensure field names match DashboardCardProps
     const cardsWithCounts = cards.map((card: any) => ({
         ...card,
         id: card.sno || card.id,
         title: card.cardTitle,
-        value: approvalCounts[card.permissionColumn] || 0
+        value: getPendingCount(card)
     }));
 
     return (
@@ -106,34 +80,30 @@ const DashboardPage = () => {
                     </div>
                     <button
                         onClick={handleRefresh}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2 shadow-lg shadow-indigo-100 disabled:opacity-70"
                         disabled={loading}
                     >
                         {loading ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
+                            <RefreshCw className="w-4 h-4" />
                         )}
                         <span>Refresh</span>
                     </button>
                 </div>
 
                 {cardsWithCounts.length === 0 ? (
-                    <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                    <div className="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
                         <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
+                            <FileText className="h-10 w-10 text-gray-400" />
                         </div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">No Cards Available</h3>
                         <p className="text-gray-500">
-                            You don't have permission to view any dashboard cards.
+                            You don't have permission to view any dashboard cards or there are no pending tasks.
                         </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {cardsWithCounts.map((card: any) => (
                             <DashboardCard
                                 key={card.sno || card.id}

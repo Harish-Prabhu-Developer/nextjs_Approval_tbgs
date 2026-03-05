@@ -1,66 +1,59 @@
-import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { RefreshCw } from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useCallback, useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { DrawerNavigationProp } from "@react-navigation/drawer";
+import { RefreshCw } from "lucide-react-native";
 
-import { DASHBOARD_CARDS, MOCK_COUNTS } from '../data/mockData';
-import { DrawerParamList } from '../navigation/types';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import DashboardCard from '../components/DashboardCard';
+import { DASHBOARD_CARDS } from "../data/mockData";
+import { DrawerParamList } from "../navigation/types";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import DashboardCard from "../components/DashboardCard";
+import { useAppDispatch, useAppSelector } from "../redux/hooks";
+import { fetchApprovalCounts } from "../redux/slices/dashboardSlice";
 
 type DashboardNav = DrawerNavigationProp<DrawerParamList>;
-const USER_DATA_KEY = 'tbgs_user';
 
 const routeMap: Record<string, keyof DrawerParamList> = {
-  'purchase-order': 'PurchaseOrder',
-  'work-order': 'WorkOrder',
-  'price-approval': 'PriceApproval',
-  'sales-return-approval': 'SalesReturn',
-};
-
-type StoredUser = {
-  name?: string;
-  permissions?: string[];
+  "purchase-order": "PurchaseOrder",
+  "work-order": "WorkOrder",
+  "price-approval": "PriceApproval",
+  "sales-return-approval": "SalesReturn",
 };
 
 export default function DashboardScreen() {
   const navigation = useNavigation<DashboardNav>();
   const insets = useSafeAreaInsets();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const { counts, loading } = useAppSelector((state) => state.dashboard);
   const [refreshing, setRefreshing] = useState(false);
-  const [dashboardCards, setDashboardCards] = useState(DASHBOARD_CARDS);
-  const [displayName, setDisplayName] = useState('User');
 
-  const hydrateUserDashboard = useCallback(async () => {
-    try {
-      const rawUser = await AsyncStorage.getItem(USER_DATA_KEY);
-      const parsedUser: StoredUser | null = rawUser ? JSON.parse(rawUser) : null;
-      const allowedPermissions = parsedUser?.permissions || [];
+  const dashboardCards = useMemo(
+    () =>
+      DASHBOARD_CARDS.filter((card) =>
+        user?.permissions?.includes(card.permissionColumn),
+      ),
+    [user],
+  );
 
-      const filteredCards = DASHBOARD_CARDS.filter((card) =>
-        allowedPermissions.includes(card.permissionColumn),
-      );
+  const displayName = user?.name || "User";
 
-      setDashboardCards(filteredCards);
-      setDisplayName(parsedUser?.name || 'User');
-    } catch {
-      setDashboardCards([]);
-      setDisplayName('User');
-    }
-  }, []);
+  const getPendingCount = (card: any) => {
+    const permissionCount = Number(counts?.[card.permissionColumn] ?? 0);
+    const routeCount = Number(counts?.[card.routeSlug] ?? 0);
+    return Math.max(permissionCount, routeCount);
+  };
 
   useFocusEffect(
     useCallback(() => {
-      void hydrateUserDashboard();
-    }, [hydrateUserDashboard]),
+      dispatch(fetchApprovalCounts());
+    }, [dispatch]),
   );
 
   const handleRefresh = async () => {
-    if (refreshing) return;
+    if (refreshing || loading) return;
     setRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    await hydrateUserDashboard();
+    await dispatch(fetchApprovalCounts());
     setRefreshing(false);
   };
 
@@ -75,11 +68,13 @@ export default function DashboardScreen() {
         </View>
         <Pressable
           onPress={handleRefresh}
-          disabled={refreshing}
+          disabled={refreshing || loading}
           className="flex-row items-center rounded-xl bg-indigo-600 px-4 py-2.5 disabled:opacity-70"
         >
           <RefreshCw size={14} color="#ffffff" />
-          <Text className="ml-2 text-sm font-bold text-white">{refreshing ? 'Refreshing' : 'Refresh'}</Text>
+          <Text className="ml-2 text-sm font-bold text-white">
+            {refreshing || loading ? "Refreshing" : "Refresh"}
+          </Text>
         </Pressable>
       </View>
       <ScrollView className="flex-1 bg-[#f0f0f0]" contentContainerStyle={{ paddingBottom: insets.bottom }}>
@@ -93,7 +88,7 @@ export default function DashboardScreen() {
         ) : (
           <View className="flex-row flex-wrap justify-between">
             {dashboardCards.map((card) => {
-              const count = MOCK_COUNTS[card.permissionColumn] || 0;
+              const count = getPendingCount(card);
 
               return (
                 <DashboardCard
@@ -111,12 +106,12 @@ export default function DashboardScreen() {
                       if (routeName) {
                         navigation.navigate(routeName as any, {
                           title: card.cardTitle,
-                          subtitle: 'Review pending requests',
+                          subtitle: "Review pending requests",
                           routeSlug: card.routeSlug,
                         } as any);
                       }
                     } else {
-                      Alert.alert('No pending entries', `No pending requests for ${card.cardTitle}`);
+                      Alert.alert("No pending entries", `No pending requests for ${card.cardTitle}`);
                     }
                   }}
                 />

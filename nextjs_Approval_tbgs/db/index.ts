@@ -1,8 +1,10 @@
-// db/index.ts
-//
-// Build-safe placeholder.
-// This project currently runs without a live DB connection during Next.js build.
-// Exporting `db` as `any` keeps seed/reset scripts type-checking without connecting.
+import 'dotenv/config';
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import * as schema from "./schema";
 
-export const db: any = {};
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
+export const db = drizzle(pool, { schema });

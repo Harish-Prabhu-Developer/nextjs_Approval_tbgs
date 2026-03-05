@@ -1,5 +1,4 @@
 "use client";
-//app/template.tsx
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -10,7 +9,8 @@ import {
     LogOut,
     LayoutDashboard,
     ShoppingCart,
-    Briefcase
+    Briefcase,
+    MessageCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
@@ -18,7 +18,10 @@ import Breadcrumbs from './components/Breadcrumbs';
 import Footer from './components/Footer';
 import FullscreenToggle from './components/FullscreenToggle';
 
-import { DASHBOARD_CARDS, MOCK_COUNTS } from './config/mockData';
+import { DASHBOARD_CARDS } from './config/mockData';
+import { useAppDispatch, useAppSelector } from '@/redux/hooks';
+import { fetchApprovalCounts } from '@/redux/slices/dashboardSlice';
+import { logout, setAuth } from '@/redux/slices/authSlice';
 
 interface MenuItem {
     id: string;
@@ -31,7 +34,8 @@ interface MenuItem {
 
 const STATIC_MENU_ITEMS: MenuItem[] = [
     { id: "dashboard", name: "Dashboard", pendingCount: 0, icon: "LayoutDashboard", path: "/dashboard", permissionColumn: "" },
-    ...DASHBOARD_CARDS.map(card => ({
+    { id: "chat", name: "Messenger", pendingCount: 0, icon: "MessageCircle", path: "/chat", permissionColumn: "" },
+    ...DASHBOARD_CARDS.map((card: any) => ({
         id: card.sno.toString(),
         name: card.cardTitle,
         pendingCount: 0,
@@ -44,125 +48,104 @@ const STATIC_MENU_ITEMS: MenuItem[] = [
 const iconMap: Record<string, any> = {
     LayoutDashboard,
     ShoppingCart,
-    Briefcase
+    Briefcase,
+    MessageCircle
 };
 
 export default function Template({ children }: { children: React.ReactNode }) {
-    const [isSidebarOpen, setSidebarOpen] = useState(true);
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [menuItems, setMenuItems] = useState<MenuItem[]>(STATIC_MENU_ITEMS);
-    const [userData, setUserData] = useState<any>(null);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [isMenuLoading, setIsMenuLoading] = useState(true);
-
+    const dispatch = useAppDispatch();
     const pathname = usePathname();
     const router = useRouter();
 
-    // Check authentication status
+    const { user, isAuthenticated } = useAppSelector((state: any) => state.auth);
+    const { counts } = useAppSelector((state: any) => state.dashboard);
+
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [menuItems, setMenuItems] = useState<MenuItem[]>(STATIC_MENU_ITEMS);
+    const [isMenuLoading, setIsMenuLoading] = useState(false);
+
+    const getPendingCount = (permissionColumn?: string, routePath?: string) => {
+        const permissionCount = Number(counts?.[permissionColumn || ""] ?? 0);
+        const routeSlug = (routePath || "").replace(/^\//, "");
+        const routeCount = Number(counts?.[routeSlug] ?? 0);
+        return Math.max(permissionCount, routeCount);
+    };
+
+    // Initial hydration of Redux from localStorage
     useEffect(() => {
-        const checkAuth = () => {
-            const token = localStorage.getItem("tbgs_access_token");
-            const isPublicRoute = pathname === "/login" || pathname === "/qrscan";
-
-            if (!token && !isPublicRoute) {
-                router.push("/login");
-                return false;
-            } else if (token && pathname === "/login") {
-                router.push("/dashboard");
-                return false;
-            } else if (token || isPublicRoute) {
-                // Parse user data from token if it exists
-                try {
-                    const storedUserData = localStorage.getItem("tbgs_user");
-                    if (storedUserData) {
-                        setUserData(JSON.parse(storedUserData));
-                    }
-                } catch (error) {
-                    console.error("Error parsing user data:", error);
-                }
-                return true;
-            }
-            return false;
-        };
-
-        const authenticated = checkAuth();
-        setIsAuthenticated(authenticated);
-        setLoading(false);
-    }, [router, pathname]);
-
-    // Fetch approval counts only when authenticated
-    // Fetch approval counts only when authenticated
-    useEffect(() => {
-        const fetchApprovalCounts = async () => {
-            if (!isAuthenticated || pathname === "/qrscan") return;
+        const token = localStorage.getItem("tbgs_access_token");
+        const storedUser = localStorage.getItem("tbgs_user");
+        if (token && storedUser && !isAuthenticated) {
             try {
-                // Simulate API delay
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                const counts = MOCK_COUNTS;
-                const userStr = localStorage.getItem("tbgs_user");
-                let allowedPermissions: string[] = [];
-                if (userStr) {
-                    const user = JSON.parse(userStr);
-                    allowedPermissions = user.permissions || [];
-                }
-
-                // Update menu items with real counts AND filter by permission
-                setMenuItems(prevItems => {
-                    // Filter items: Keep 'dashboard' OR items where permission matches
-                    const filtered = STATIC_MENU_ITEMS.filter(item =>
-                        item.id === "dashboard" ||
-                        (item.permissionColumn && allowedPermissions.includes(item.permissionColumn))
-                    );
-
-                    return filtered.map(item => {
-                        if (item.permissionColumn && counts[item.permissionColumn] !== undefined) {
-                            return { ...item, pendingCount: counts[item.permissionColumn] };
-                        }
-                        return item;
-                    });
-                });
-
-                setIsMenuLoading(false);
-            } catch (error) {
-                console.error('Failed to fetch approval counts:', error);
-                setIsMenuLoading(false);
+                dispatch(setAuth({ user: JSON.parse(storedUser), token }));
+            } catch (e) {
+                console.error("Auth hydration failed", e);
             }
-        };
+        }
+    }, [dispatch, isAuthenticated]);
 
-        fetchApprovalCounts();
-    }, [isAuthenticated, pathname]);
+    // Auth sync and redirection
+    useEffect(() => {
+        const isPublicRoute = pathname ? (pathname === "/login" || pathname === "/qrscan") : false;
+        const token = localStorage.getItem("tbgs_access_token");
+
+        if (!token && !isPublicRoute) {
+            router.push("/login");
+        } else if (token && pathname === "/login") {
+            router.push("/dashboard");
+        }
+    }, [pathname, router]);
+
+    // Fetch counts when authenticated
+    useEffect(() => {
+        if (isAuthenticated && pathname && pathname !== "/qrscan" && pathname !== "/login") {
+            dispatch(fetchApprovalCounts());
+        }
+    }, [dispatch, isAuthenticated, pathname]);
+
+    // Update menu items based on counts and permissions from Redux
+    useEffect(() => {
+        if (!user) {
+            // If not logged in, just show dashboard or empty
+            setMenuItems(STATIC_MENU_ITEMS.filter(item => item.id === "dashboard"));
+            return;
+        }
+
+        const updatedMenu = STATIC_MENU_ITEMS.map(item => {
+            if (item.id === "dashboard") return item;
+
+            const count = getPendingCount(item.permissionColumn, item.path);
+            return { ...item, pendingCount: count };
+        }).filter(item => {
+            if (item.id === "dashboard" || item.id === "chat") return true;
+            return user.permissions?.includes(item.permissionColumn || '');
+        });
+
+        setMenuItems(updatedMenu);
+    }, [counts, user]);
 
     const handleLogout = () => {
-        localStorage.removeItem('tbgs_access_token');
-        localStorage.removeItem('tbgs_user');
-        // approvalService.clearCache(); removed
-        router.push('/login');
+        dispatch(logout());
         toast.success('Logged out successfully');
+        router.push('/login');
     };
 
     const handleMenuItemClick = (item: MenuItem) => {
-        const isDashboard = item.path === '/dashboard';
-        const hasPending = Number(item.pendingCount) > 0;
-        const isActive = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(`${item.path}/`));
-
-        if (isDashboard || hasPending || isActive) {
-            setIsMobileSidebarOpen(false);
-            router.push(item.path);
-        } else {
-            toast.error(`No pending entries for ${item.name}`);
-        }
+        setIsMobileSidebarOpen(false);
+        router.push(item.path);
     };
 
     // Extract user info safely
-    const activeUser = Array.isArray(userData) ? userData[0] : userData;
-    const username = activeUser?.empName || activeUser?.userApprovalName || activeUser?.name || 'User';
+    const activeUser = user;
+    const username = activeUser?.name || 'User';
     const userEmail = activeUser?.email || 'user@example.com';
     const isExpanded = isMobileSidebarOpen || isSidebarOpen;
 
-    if (loading) {
+    const isPublicRoute = pathname ? (pathname === "/login" || pathname === "/qrscan") : false;
+    const isLoading = !isAuthenticated && !isPublicRoute;
+
+    if (isLoading) {
         return (
             <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50">
                 <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
@@ -171,8 +154,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
         );
     }
 
-    // Don't show sidebar/navbar on login page or qrscan page
-    if (pathname === "/login" || pathname === "/qrscan") {
+    if (isPublicRoute) {
         return children;
     }
 
@@ -239,7 +221,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
                         menuItems.map((item) => {
                             const Icon = iconMap[item.icon as keyof typeof iconMap] || LayoutDashboard;
                             const hasPendingItems = item.pendingCount > 0;
-                            const isActive = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(`${item.path}/`));
+                            const isActive = pathname ? (pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(`${item.path}/`))) : false;
 
                             return (
                                 <button

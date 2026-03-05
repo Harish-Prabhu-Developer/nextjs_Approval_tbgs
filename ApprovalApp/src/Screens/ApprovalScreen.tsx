@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -40,6 +40,8 @@ import {
 import DataTable, { Column } from '../components/DataTable';
 import FilterForm from '../components/FilterForm';
 import PdfViewerModal from '../components/PdfViewerModal';
+import { useAppDispatch, useAppSelector } from '../redux/hooks';
+import { fetchApprovalRecords } from '../redux/slices/approvalSlice';
 import {
     PURCHASE_ORDER_DTL,
     PURCHASE_ORDER_FILES_UPLOAD,
@@ -396,6 +398,8 @@ export default function ApprovalScreen() {
     const route = useRoute();
     const navigation = useNavigation<ModuleNavProp>();
     const insets = useSafeAreaInsets();
+    const dispatch = useAppDispatch();
+    const { records, loading: approvalLoading } = useAppSelector((state) => state.approval);
 
     const params = (route.params as any) || {};
     const { title = 'Approval Details', subtitle = 'Entries queue', routeSlug = 'purchase-order' } = params;
@@ -417,23 +421,36 @@ export default function ApprovalScreen() {
     const [currentInvoiceHtml, setCurrentInvoiceHtml] = useState<string>("");
     const [currentPdfTitle, setCurrentPdfTitle] = useState<string>("");
 
+    useEffect(() => {
+        dispatch(fetchApprovalRecords(routeSlug));
+    }, [dispatch, routeSlug]);
+
+    const sourceData = useMemo(() => {
+        if (Array.isArray(records) && records.length > 0) {
+            return records;
+        }
+        return MOCK_APPROVAL_DATA[routeSlug] || [];
+    }, [records, routeSlug]);
+
+    const effectiveLoading = isLoading || approvalLoading;
+
     // Filter Options Generation
     const filterOptions = useMemo(() => {
-        const rawData = MOCK_APPROVAL_DATA[routeSlug] || [];
+        const rawData = sourceData;
         return {
             companies: Array.from(new Set(rawData.map((i: any) => i.companyId))).filter(Boolean).map(String),
             purchaseTypes: Array.from(new Set(rawData.map((i: any) => i.purchaseType))).filter(Boolean).map(String),
             suppliers: Array.from(new Set(rawData.map((i: any) => i.supplierId))).filter(Boolean).map(String),
             departments: Array.from(new Set(rawData.map((i: any) => i.poStoreId))).filter(Boolean).map(String),
         };
-    }, [routeSlug]);
+    }, [sourceData]);
 
     // Data Filtering Logic
     const filteredData = useMemo(() => {
-        const rawData = MOCK_APPROVAL_DATA[routeSlug] || [];
+        const rawData = sourceData;
         const baseData = rawData.map((item: any) => ({
             ...item,
-            id: item.sno,
+            id: item.id ?? item.sno,
             status: item.finalResponseStatus || item.statusEntry || 'PENDING'
         }));
 
@@ -463,7 +480,7 @@ export default function ApprovalScreen() {
 
             return true;
         });
-    }, [filters, routeSlug]);
+    }, [filters, sourceData]);
 
     const handleApplyFilters = (newFilters: any) => {
         setIsLoading(true);
@@ -945,7 +962,7 @@ export default function ApprovalScreen() {
                     filterOptions={filterOptions}
                     onApplyFilters={handleApplyFilters}
                     onReset={() => setFilters({})}
-                    isLoading={isLoading}
+                    isLoading={effectiveLoading}
                     title={`Filter Approval Requests`}
                 />
 
@@ -986,7 +1003,7 @@ export default function ApprovalScreen() {
                     data={filteredData}
                     columns={columns}
                     rowKey="id"
-                    isLoading={isLoading}
+                    isLoading={effectiveLoading}
                     totalRows={filteredData.length}
                     exportOptions={{
                         enabled: true,

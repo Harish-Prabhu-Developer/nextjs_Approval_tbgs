@@ -14,12 +14,23 @@ import {
     FileText,
     MessageSquareMore
 } from "lucide-react";
+import Image from "next/image";
 import toast from "react-hot-toast";
 import PdfViewerModal from "../components/ApprovalDetails/PdfViewerModal";
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import { fetchApprovalRecords } from "@/redux/slices/approvalSlice";
+
+interface ApprovalDetailsPageProps {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+type PendingStatusUpdate = {
+    ids: number[];
+    status: "PENDING" | "APPROVED" | "REJECTED" | "HOLD";
+};
 
 // Mock data
 import {
-    MOCK_APPROVAL_DATA,
     DASHBOARD_CARDS,
     PURCHASE_ORDER_FILES_UPLOAD,
     INVOICE_TEMPLATE_DATA,
@@ -30,46 +41,59 @@ import {
     COMPANY_MASTER,
     STORE_MASTER
 } from "../config/mockData";
-import Image from "next/image";
 
 
 // Main Table columns
-const getTableColumns = (
+function getTableColumns(
+    approvalType: string,
     onViewDetails: (row: any) => void,
     onViewDocument: (row: any) => void,
     onGenerateInvoicePdf: (row: any) => void | Promise<void>,
     onViewConversation: (row: any) => void
-): Column[] => [
+): Column[] {
+    const nType = (approvalType || '').toLowerCase();
+    const isPO = nType === 'purchase-order';
+    const isWO = nType === 'work-order';
+    const isPA = nType === 'price-approval';
+    const isSR = nType === 'sales-return-approval';
+
+    const refLabel = isPO ? 'PO NO' : isWO ? 'WO NO' : isPA ? 'PA NO' : isSR ? 'SR NO' : 'REF NO';
+    const typeLabel = isPO ? 'PO Type' : isWO ? 'WO Type' : isPA ? 'Price Type' : isSR ? 'SR Type' : 'Type';
+
+    return [
         {
             key: 'action',
             label: 'Action',
-            headerAlign: 'center' as const,
+            headerAlign: 'center',
+            width: '180px',
             render: (_: any, row: any, { isExpanded, toggleExpansion }: any) => (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-center space-x-1.5 min-w-[160px]">
                     <button
                         onClick={() => onViewDetails(row)}
-                        className="p-1 px-1.5 text-indigo-500 hover:bg-indigo-50 rounded transition-all border border-transparent hover:border-indigo-100"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg text-indigo-500 hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100 shrink-0"
                         title="View Details"
                     >
                         <Eye size={16} strokeWidth={2.5} />
                     </button>
+
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onViewDocument(row);
                         }}
-                        className="p-1 px-1.5 text-emerald-500 hover:bg-emerald-50 rounded transition-all border border-transparent hover:border-emerald-100"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all border border-emerald-200 shrink-0"
                         title="View Document"
                     >
                         <FileText size={16} strokeWidth={2.5} />
                     </button>
+
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onGenerateInvoicePdf(row);
                         }}
-                        className="inline-flex items-center justify-center w-8 h-8 text-emerald-500 hover:bg-emerald-50 rounded transition-all border border-transparent hover:border-emerald-100 shrink-0"
-                        title="View PDF Document"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all border border-rose-200 shrink-0"
+                        title="Generate PDF"
                     >
                         <Image
                             src="/pdf_icon.png"
@@ -79,22 +103,23 @@ const getTableColumns = (
                             className="block w-4 h-4 object-contain"
                         />
                     </button>
+
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onViewConversation(row);
                         }}
-                        className="p-1 px-1.5 text-slate-500 hover:bg-slate-50 rounded transition-all border border-transparent hover:border-slate-100"
-                        title="View Conversation"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg text-amber-600 hover:bg-amber-50 transition-all border border-transparent hover:border-amber-100 shrink-0"
+                        title="Conversation"
                     >
                         <MessageSquareMore size={16} strokeWidth={2.5} />
                     </button>
 
                     <button
                         onClick={toggleExpansion}
-                        className={`p-1 px-1.5 rounded transition-all border ${isExpanded
+                        className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all border shrink-0 ${isExpanded
                             ? 'bg-indigo-600 text-white border-indigo-600 rotate-180'
-                            : 'text-slate-400 hover:bg-slate-100 border-transparent'
+                            : 'text-slate-400 hover:bg-slate-100 border-slate-200'
                             }`}
                         title={isExpanded ? "Collapse" : "Expand"}
                     >
@@ -105,9 +130,9 @@ const getTableColumns = (
         },
         { key: 'sno', label: 'SNO', render: (val: number) => <span className="font-bold text-slate-800">{val}</span> },
         { key: 'companyId', label: 'Comp ID', render: (val: number) => <span className="text-slate-500 font-semibold">{val}</span> },
-        { key: 'poRefNo', label: 'PO NO', render: (value: string) => <span className="text-[13px] font-bold text-slate-700">{value}</span> },
+        { key: 'poRefNo', label: refLabel, render: (value: string) => <span className="text-[13px] font-bold text-slate-700">{value}</span> },
         {
-            key: 'purchaseType', label: 'PO Type', render: (value: string) => (
+            key: 'purchaseType', label: typeLabel, render: (value: string) => (
                 <span className="px-2.5 py-1 text-[11px] font-bold rounded bg-emerald-100 text-emerald-700">
                     {value}
                 </span>
@@ -138,7 +163,7 @@ const getTableColumns = (
                             {diffDays}
                         </div>
                     </div>
-                )
+                );
             }
         },
         {
@@ -151,20 +176,15 @@ const getTableColumns = (
             )
         }
     ];
-
-interface ApprovalDetailsPageProps {
-    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
-
-type PendingStatusUpdate = {
-    ids: number[];
-    status: "PENDING" | "APPROVED" | "REJECTED" | "HOLD";
-};
 
 const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
     const router = useRouter();
     const params = useParams();
+    const dispatch = useAppDispatch();
     const approvalType = params.approvalType as string;
+
+    const { records, loading: recordsLoading } = useAppSelector((state: any) => state.approval);
 
     // Get query parameters from URL
     const [queryParams, setQueryParams] = useState<Record<string, string>>({});
@@ -194,6 +214,12 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const [selectedRows, setSelectedRows] = useState<number[]>([]);
     const [expandedRows, setExpandedRows] = useState<number[]>([]);
+
+    useEffect(() => {
+        if (approvalType) {
+            dispatch(fetchApprovalRecords(approvalType));
+        }
+    }, [dispatch, approvalType]);
 
     const confirmStatusChange = () => {
         if (!pendingStatusUpdate || !remarksInput.trim()) return;
@@ -464,7 +490,7 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
 
     // Combined Data Filtering logic
     const filteredData = useMemo(() => {
-        const rawData = MOCK_APPROVAL_DATA[approvalType] || [];
+        const rawData = records || [];
 
         // Map raw data to include calculated fields
         const data = rawData.map((item: any) => {
@@ -522,7 +548,7 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
 
             return true;
         });
-    }, [filters, approvalType]);
+    }, [filters, approvalType, records]);
 
     const handleApplyFilters = (newFilters: any) => {
         setIsLoading(true);
@@ -547,8 +573,8 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
     }, [approvalType, router, queryParams]);
 
     const tableColumns = useMemo(
-        () => getTableColumns(handleViewDetails, handleViewDocument, handleGenerateInvoicePdf, handleViewConversation),
-        [handleViewDetails, handleViewDocument, handleGenerateInvoicePdf, handleViewConversation]
+        () => getTableColumns(approvalType, handleViewDetails, handleViewDocument, handleGenerateInvoicePdf, handleViewConversation),
+        [approvalType, handleViewDetails, handleViewDocument, handleGenerateInvoicePdf, handleViewConversation]
     );
 
     return (
@@ -572,14 +598,14 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                         isLoading={isLoading}
                         title={`Filter ${pageTitle} Requests`}
                         filterOptions={useMemo(() => {
-                            const rawData = MOCK_APPROVAL_DATA[approvalType] || [];
+                            const rawData = records || [];
                             return {
                                 companies: Array.from(new Set(rawData.map((i: any) => i.companyId))).filter(Boolean).map(String),
                                 purchaseTypes: Array.from(new Set(rawData.map((i: any) => i.purchaseType))).filter(Boolean),
                                 suppliers: Array.from(new Set(rawData.map((i: any) => i.supplierId))).filter(Boolean),
                                 departments: Array.from(new Set(rawData.map((i: any) => i.poStoreId))).filter(Boolean)
                             };
-                        }, [approvalType])}
+                        }, [records])}
                     />
 
                     {/* Dynamic Data Table Implementation */}
@@ -589,7 +615,7 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                         data={filteredData}
                         totalRows={filteredData.length}
                         columns={tableColumns}
-                        isLoading={isLoading}
+                        isLoading={isLoading || recordsLoading}
                         showSearch={true}
                         onSearch={() => { }}
                         // Export Configuration
@@ -910,6 +936,12 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                     </div>
                 </div>
             )}
+            <PdfViewerModal
+                isOpen={isPdfModalOpen}
+                onClose={() => setIsPdfModalOpen(false)}
+                pdfData={currentPdfData}
+                title={currentPdfTitle}
+            />
         </>
     );
 };
