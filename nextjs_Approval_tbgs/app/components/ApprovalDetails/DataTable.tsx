@@ -20,6 +20,7 @@ export interface Column {
     label: string;
     responsiveClass?: string;
     headerAlign?: 'left' | 'center' | 'right';
+    width?: string;
     render?: (value: any, row?: any, options?: any) => React.ReactNode;
 }
 
@@ -598,6 +599,7 @@ const DataTable: React.FC<DataTableProps> = ({
                                 <th
                                     key={col.key || idx}
                                     onClick={() => handleSort(col.key)}
+                                    style={{ width: col.width }}
                                     className={`px-4 py-3.5 text-[12px] font-black text-slate-600 uppercase tracking-widest cursor-pointer hover:bg-indigo-100/50 transition-colors whitespace-nowrap ${col.responsiveClass || ''}`}
                                 >
                                     <div className={`flex items-center space-x-1.5 ${col.headerAlign === 'center' ? 'justify-center' : col.headerAlign === 'right' ? 'justify-end' : ''}`}>

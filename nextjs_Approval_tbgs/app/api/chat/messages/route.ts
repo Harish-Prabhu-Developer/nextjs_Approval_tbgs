@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { senderId, receiverId, message, imageUrl, fileUrl, fileName, fileType } = body;
+        const { senderId, receiverId, message, imageUrl, fileUrl, fileName, fileType, replyTo } = body;
 
         if (!senderId || !receiverId || (!message && !fileUrl)) {
             return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
@@ -44,7 +44,8 @@ export async function POST(request: Request) {
             fileUrl,
             fileName,
             fileType,
-            isRead: false
+            isRead: false,
+            replyTo
         }).returning();
 
         return NextResponse.json(newMessage[0]);

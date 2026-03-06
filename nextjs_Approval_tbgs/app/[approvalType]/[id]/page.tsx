@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Download, AlertCircle, ArrowLeft, Loader2, FileText } from "lucide-react";
+import ExpandableText from "@/app/components/ExpandableText";
+
 
 import { DASHBOARD_CARDS } from "../../config/mockData";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
@@ -17,8 +19,8 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
     const params = useParams();
     const dispatch = useAppDispatch();
 
-    const approvalType = params.approvalType as string;
-    const id = params.id as string;
+    const approvalType = (params?.approvalType as string) || "";
+    const id = (params?.id as string) || "";
 
     const { currentRecord: rowData, loading } = useAppSelector((state: any) => state.approval);
 
@@ -26,7 +28,9 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
     const [queryParams, setQueryParams] = useState<Record<string, string>>({});
 
     useEffect(() => {
+        if (!searchParams) return;
         searchParams.then((params) => {
+            if (!params) return;
             const paramsObj: Record<string, string> = {};
             Object.entries(params).forEach(([key, value]) => {
                 if (typeof value === 'string') {
@@ -46,6 +50,13 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
             dispatch(clearCurrentRecord());
         };
     }, [dispatch, approvalType, id]);
+
+    const pageTitle = React.useMemo(() => {
+        if (queryParams.cardTitle) return queryParams.cardTitle;
+        const card = DASHBOARD_CARDS.find(c => c.routeSlug === approvalType);
+        if (card) return card.cardTitle;
+        return approvalType?.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+    }, [approvalType, queryParams]);
 
     // Format currency amount
     const formatAmount = (amount: any, currency: string) => {
@@ -128,12 +139,6 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
         }
     ];
 
-    const pageTitle = React.useMemo(() => {
-        if (queryParams.cardTitle) return queryParams.cardTitle;
-        const card = DASHBOARD_CARDS.find(c => c.routeSlug === approvalType);
-        if (card) return card.cardTitle;
-        return approvalType?.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
-    }, [approvalType, queryParams]);
 
     if (loading) {
         return (
@@ -248,7 +253,11 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
                                                     ? "italic bg-slate-50 border border-slate-100 text-slate-600 font-medium text-[13px]"
                                                     : "bg-white text-slate-800 font-bold text-[15px] p-0"}
                                             `}>
-                                                {item.value}
+                                                {item.label === "Remarks" ? (
+                                                    <ExpandableText text={item.value} limit={60} />
+                                                ) : (
+                                                    item.value
+                                                )}
                                             </div>
                                         )}
                                     </div>

@@ -62,6 +62,18 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
       socket.on('typing', ({ receiverId, typing, userId }) => {
         const targetRoom = `user-${Number(receiverId)}`;
         io.to(targetRoom).emit('user-typing', { userId, typing });
+
+        // Server-side safety: auto-clear typing after 5s in case client goes silent
+        if (typing) {
+            const key = `typing_${socket.id}_${receiverId}`;
+            if ((socket as any)._typingTimers?.[key]) {
+                clearTimeout((socket as any)._typingTimers[key]);
+            }
+            if (!(socket as any)._typingTimers) (socket as any)._typingTimers = {};
+            (socket as any)._typingTimers[key] = setTimeout(() => {
+                io.to(targetRoom).emit('user-typing', { userId, typing: false });
+            }, 5000);
+        }
       });
 
       socket.on('messages-read', ({ senderId, receiverId }) => {
@@ -73,6 +85,11 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
             senderId: sId, 
             receiverId: rId 
         });
+      });
+
+      socket.on('delete-message', ({ messageId, receiverId }) => {
+        const targetRoom = `user-${Number(receiverId)}`;
+        io.to(targetRoom).emit('message-deleted', { messageId });
       });
 
       socket.on('disconnect', async () => {

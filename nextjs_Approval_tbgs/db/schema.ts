@@ -8,7 +8,8 @@ import {
   timestamp,
   boolean,
   date,
-  serial
+  serial,
+  jsonb
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -325,6 +326,7 @@ export const chatMessages = pgTable("tbl_chat_messages", {
   fileType: varchar("file_type", { length: 100 }),
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  replyTo: jsonb("reply_to"),
 });
 
 export const userStatus = pgTable("tbl_user_status", {

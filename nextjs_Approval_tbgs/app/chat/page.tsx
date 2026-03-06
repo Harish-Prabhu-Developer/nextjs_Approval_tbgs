@@ -83,6 +83,7 @@ export default function ChatPage() {
     useEffect(() => {
         if (selectedUserId !== null) {
             setMessages([]);
+            setIsTyping(false); // Reset typing state when switching chats
             fetchMessages(selectedUserId);
         }
     }, [selectedUserId, fetchMessages]);
@@ -141,10 +142,15 @@ export default function ChatPage() {
                 setMessages(prev => {
                     const msgId = Number(data.id);
                     if (prev.find(m => Number(m.id) === msgId)) return prev;
-                    // If I am the receiver and I'm looking at the chat, mark it as read locally immediately
                     const finalMsg = (dataRId === myId) ? { ...data, isRead: true } : data;
                     return [...prev, finalMsg];
                 });
+
+                // Clear typing indicator when a message arrives
+                if (dataSId === activeId) {
+                    setIsTyping(false);
+                    setUsers(prev => prev.map(u => u.id === dataSId ? { ...u, isTyping: false } : u));
+                }
 
                 // 3. Trigger markAsRead if I just received a message while active
                 if (dataRId === myId && activeId !== null) {
@@ -186,10 +192,16 @@ export default function ChatPage() {
 
         socket.on('user-typing', ({ userId, typing }) => {
             const uId = Number(userId);
+            // Only update isTyping state if the typing person is the one we're currently chatting with
             setUsers(prev => prev.map(u => u.id === uId ? { ...u, isTyping: typing } : u));
             if (uId === selectedUserRef.current) {
                 setIsTyping(typing);
             }
+        });
+
+        socket.on('message-deleted', ({ messageId }) => {
+            console.log("Socket: message-deleted received", messageId);
+            setMessages(prev => prev.filter(m => Number(m.id) !== Number(messageId)));
         });
 
         return () => {
@@ -197,6 +209,7 @@ export default function ChatPage() {
             socket.off('on-messages-read');
             socket.off('status-update');
             socket.off('user-typing');
+            socket.off('message-deleted');
         };
     }, [socket, currentUser?.id, markAsRead]);
 
@@ -223,7 +236,8 @@ export default function ChatPage() {
             fileType: fileData?.fileType,
             createdAt: new Date(), // Using Date object for local consistency
             isSending: true,
-            isRead: false
+            isRead: false,
+            replyTo: fileData?.replyTo
         };
 
         setMessages(prev => [...prev, optimisticMsg]);
@@ -252,7 +266,8 @@ export default function ChatPage() {
                 message: text,
                 fileUrl: finalFileData.fileUrl,
                 fileName: finalFileData.fileName,
-                fileType: finalFileData.fileType
+                fileType: finalFileData.fileType,
+                replyTo: fileData?.replyTo
             });
 
             // 3. Clean up the local blob URL if we created one
@@ -330,6 +345,12 @@ export default function ChatPage() {
                         setUsers(prev => prev.map(u =>
                             u.id === selectedUserId ? { ...u, lastMessage: null, lastMessageTime: null } : u
                         ));
+                    }}
+                    onDeleteMessage={(id) => {
+                        setMessages(prev => prev.filter(m => Number(m.id) !== Number(id)));
+                        if (socket) {
+                            socket.emit('delete-message', { messageId: id, receiverId: selectedUserId });
+                        }
                     }}
                     isRecipientTyping={isTyping}
                     onBack={() => setSelectedUserId(null)}

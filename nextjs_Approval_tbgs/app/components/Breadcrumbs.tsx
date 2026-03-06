@@ -13,10 +13,13 @@ interface BreadcrumbsProps {
 const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ customTitle, className = "" }) => {
     const pathname = usePathname();
     const searchParams = useSearchParams();
+
+    if (!pathname) return null;
+
     const pathnames = pathname.split("/").filter((x) => x);
 
     // Get card title from query parameters if available
-    const cardTitle = searchParams.get("cardTitle");
+    const cardTitle = searchParams ? searchParams.get("cardTitle") : null;
 
     // Function to format breadcrumb text
     const formatBreadcrumb = (text: string) => {

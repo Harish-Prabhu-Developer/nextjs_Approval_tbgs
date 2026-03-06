@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import ExpandableText from "../components/ExpandableText";
+
 import PdfViewerModal from "../components/ApprovalDetails/PdfViewerModal";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { fetchApprovalRecords } from "@/redux/slices/approvalSlice";
@@ -182,7 +184,7 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
     const router = useRouter();
     const params = useParams();
     const dispatch = useAppDispatch();
-    const approvalType = params.approvalType as string;
+    const approvalType = (params?.approvalType as string) || "";
 
     const { records, loading: recordsLoading } = useAppSelector((state: any) => state.approval);
 
@@ -198,8 +200,10 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
 
 
     useEffect(() => {
+        if (!searchParams) return;
         // Convert Promise to actual values
         searchParams.then((params) => {
+            if (!params) return;
             const paramsObj: Record<string, string> = {};
             Object.entries(params).forEach(([key, value]) => {
                 if (typeof value === 'string') {
@@ -601,9 +605,9 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                             const rawData = records || [];
                             return {
                                 companies: Array.from(new Set(rawData.map((i: any) => i.companyId))).filter(Boolean).map(String),
-                                purchaseTypes: Array.from(new Set(rawData.map((i: any) => i.purchaseType))).filter(Boolean),
-                                suppliers: Array.from(new Set(rawData.map((i: any) => i.supplierId))).filter(Boolean),
-                                departments: Array.from(new Set(rawData.map((i: any) => i.poStoreId))).filter(Boolean)
+                                purchaseTypes: Array.from(new Set(rawData.map((i: any) => i.purchaseType))).filter(Boolean).map(String),
+                                suppliers: Array.from(new Set(rawData.map((i: any) => i.supplierId))).filter(Boolean).map(String),
+                                departments: Array.from(new Set(rawData.map((i: any) => i.poStoreId))).filter(Boolean).map(String)
                             };
                         }, [records])}
                     />
@@ -782,9 +786,9 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
 
                                                 <div className="relative pl-4 border-l-2 border-slate-100 py-1">
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Audit Remarks</p>
-                                                    <p className="text-[13px] text-slate-600 leading-relaxed font-medium capitalize italic">
-                                                        {`"${row.response1Remarks || "Pending technical validation of specific line items and supplier terms."}"`}
-                                                    </p>
+                                                    <div className="text-[13px] text-slate-600 leading-relaxed font-medium capitalize italic">
+                                                        "<ExpandableText text={row.response1Remarks || "Pending technical validation of specific line items and supplier terms."} limit={100} />"
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -815,9 +819,9 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
 
                                                 <div className="relative pl-4 border-l-2 border-slate-100 py-1">
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Final Remarks</p>
-                                                    <p className="text-[13px] text-slate-600 leading-relaxed font-medium capitalize italic">
-                                                        {`"${row.response2Remarks || "Awaiting final sign-off from the department head to execute procurement."}"`}
-                                                    </p>
+                                                    <div className="text-[13px] text-slate-600 leading-relaxed font-medium capitalize italic">
+                                                        "<ExpandableText text={row.response2Remarks || "Awaiting final sign-off from the department head to execute procurement."} limit={100} />"
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

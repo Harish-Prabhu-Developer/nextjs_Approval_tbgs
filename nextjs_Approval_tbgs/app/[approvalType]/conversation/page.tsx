@@ -14,6 +14,8 @@ import {
     Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ExpandableText from '@/app/components/ExpandableText';
+
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { fetchConversation, clearCurrentRecord } from '@/redux/slices/approvalSlice';
 
@@ -32,7 +34,7 @@ interface ConversationItem {
 const ConversationContent = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const poRefNo = searchParams.get('poRefNo');
+    const poRefNo = searchParams ? searchParams.get('poRefNo') : "";
     const dispatch = useAppDispatch();
 
     const { conversations: data, loading } = useAppSelector((state: any) => state.approval);
@@ -167,9 +169,9 @@ const ConversationContent = () => {
                                                 <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
                                                 <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Subject</h4>
                                             </div>
-                                            <p className="text-[14px] text-slate-600 leading-relaxed font-bold pl-4">
-                                                {item.discussionDetails}
-                                            </p>
+                                            <div className="text-[14px] text-slate-600 leading-relaxed font-bold pl-4">
+                                                <ExpandableText text={item.discussionDetails} limit={120} />
+                                            </div>
                                         </div>
                                     )}
 
@@ -178,9 +180,9 @@ const ConversationContent = () => {
                                             <span className="w-1 h-3 bg-slate-200 rounded-full mr-2"></span>
                                             Resolution Remarks
                                         </h4>
-                                        <p className="text-[14px] text-slate-700 leading-relaxed font-medium italic">
-                                            "{item.remarks}"
-                                        </p>
+                                        <div className="text-[14px] text-slate-700 leading-relaxed font-medium italic">
+                                            "<ExpandableText text={item.remarks} limit={80} />"
+                                        </div>
                                     </div>
 
                                     <div className="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">

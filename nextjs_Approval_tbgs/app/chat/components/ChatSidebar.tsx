@@ -32,19 +32,32 @@ interface ChatSidebarProps {
 
 export default function ChatSidebar({ users, currentUser, selectedUserId, onSelectUser, isLoading }: ChatSidebarProps) {
     const [searchTerm, setSearchTerm] = useState('');
+    const [newChatSearch, setNewChatSearch] = useState('');
     const [isNewChatOpen, setIsNewChatOpen] = useState(false);
 
-    const filteredUsers = users
+    // Main list: only show users who have chat history (message OR file/image)
+    const chattedUsers = users
         .filter(user =>
             user.id !== currentUser?.id &&
-            (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                user.username.toLowerCase().includes(searchTerm.toLowerCase()))
+            (user.lastMessage || user.lastFileUrl) // Only show if there is history
+        )
+        .filter(user =>
+            user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.username.toLowerCase().includes(searchTerm.toLowerCase())
         )
         .sort((a, b) => {
             const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
             const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
             return timeB - timeA;
         });
+
+    // New chat panel: ALL contacts (no history filter)
+    const allContacts = users
+        .filter(user =>
+            user.id !== currentUser?.id &&
+            (user.name.toLowerCase().includes(newChatSearch.toLowerCase()) ||
+                user.username.toLowerCase().includes(newChatSearch.toLowerCase()))
+        );
 
     const SkeletonLoader = () => (
         <div className="space-y-4 p-4">
@@ -60,8 +73,17 @@ export default function ChatSidebar({ users, currentUser, selectedUserId, onSele
         </div>
     );
 
+    const getLastMessagePreview = (user: User) => {
+        if (user.isTyping) return 'typing...';
+        if (user.lastMessage) return user.lastMessage;
+        if (user.lastFileUrl) {
+            return user.lastFileType?.startsWith('image/') ? '📷 Photo' : '📄 File';
+        }
+        return '';
+    };
+
     return (
-        <div className="w-full md:w-80 h-full flex flex-col bg-white border-r border-slate-200">
+        <div className="w-full md:w-80 h-full flex flex-col bg-white border-r border-slate-200 relative">
             {/* Sidebar Header */}
             <div className="p-4 bg-white flex items-center justify-between border-b border-slate-100 sticky top-0 z-10">
                 <div className="flex items-center space-x-3">
@@ -94,12 +116,12 @@ export default function ChatSidebar({ users, currentUser, selectedUserId, onSele
                 </div>
             </div>
 
-            {/* Users List */}
+            {/* Users List — only those with chat history */}
             <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                 {isLoading ? (
                     <SkeletonLoader />
-                ) : filteredUsers.length > 0 ? (
-                    filteredUsers.map((user) => (
+                ) : chattedUsers.length > 0 ? (
+                    chattedUsers.map((user) => (
                         <motion.div
                             key={user.id}
                             initial={{ opacity: 0 }}
@@ -136,14 +158,10 @@ export default function ChatSidebar({ users, currentUser, selectedUserId, onSele
                                             ? 'text-slate-900 font-semibold'
                                             : (selectedUserId === user.id ? 'text-indigo-600/80' : 'text-slate-500'))
                                         }`}>
-                                        {user.isTyping ? 'typing...' : (
-                                            user.lastMessage ? user.lastMessage : (
-                                                user.lastFileUrl ? (user.lastFileType?.startsWith('image/') ? '📷 Photo' : '📄 File') : user.username
-                                            )
-                                        )}
+                                        {getLastMessagePreview(user)}
                                     </p>
                                     {user.unreadCount && user.unreadCount > 0 && (
-                                        <div className="bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full min-w-5 flex items-center justify-center shadow-lg shadow-emerald-200 animate-bounce-subtle">
+                                        <div className="bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full min-w-5 flex items-center justify-center shadow-lg shadow-emerald-200">
                                             {user.unreadCount > 9 ? '9+' : user.unreadCount}
                                         </div>
                                     )}
@@ -152,30 +170,42 @@ export default function ChatSidebar({ users, currentUser, selectedUserId, onSele
                         </motion.div>
                     ))
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center bg-slate-50/30 mx-3 my-2 rounded-2xl border border-dashed border-slate-200">
-                        <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4">
-                            <UserPlus size={32} className="text-slate-300" />
+                    // Empty state
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
+                        <div className="w-20 h-20 bg-slate-50 rounded-3xl shadow-xs flex items-center justify-center mb-5 border border-dashed border-slate-200">
+                            <MessageSquare size={36} className="text-slate-300" />
                         </div>
-                        <h4 className="text-slate-600 font-bold mb-1">No chats found</h4>
-                        <p className="text-xs leading-relaxed">Start a new conversation with someone from your network.</p>
+                        <h4 className="text-slate-700 font-bold mb-1 text-base">No conversations yet</h4>
+                        <p className="text-xs leading-relaxed text-slate-400 mb-5">
+                            {searchTerm ? `No chats matching "${searchTerm}"` : 'Tap below to start your first chat!'}
+                        </p>
+                        {!searchTerm && (
+                            <button
+                                onClick={() => setIsNewChatOpen(true)}
+                                className="flex items-center space-x-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                            >
+                                <Plus size={16} />
+                                <span>Start New Chat</span>
+                            </button>
+                        )}
                     </div>
                 )}
 
-                {/* Floating WhatsApp Style Button */}
-                <motion.button
-                    whileHover={{ scale: 1.05, translateY: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setIsNewChatOpen(true)}
-                    className="absolute bottom-6 right-6 w-14 h-14 bg-emerald-500 text-white rounded-2xl shadow-xl shadow-emerald-200/60 flex items-center justify-center z-20 cursor-pointer overflow-hidden group"
-                >
-                    <div className="absolute inset-0 bg-linear-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="relative">
+                {/* Floating WhatsApp-style Button — only visible when there are chats */}
+                {chattedUsers.length > 0 && (
+                    <motion.button
+                        whileHover={{ scale: 1.05, translateY: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setIsNewChatOpen(true)}
+                        className="absolute bottom-6 right-6 w-14 h-14 bg-emerald-500 text-white rounded-2xl shadow-xl shadow-emerald-200/60 flex items-center justify-center z-20 cursor-pointer overflow-hidden group"
+                    >
+                        <div className="absolute inset-0 bg-linear-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <Plus size={28} strokeWidth={2.5} />
-                    </div>
-                </motion.button>
+                    </motion.button>
+                )}
             </div>
 
-            {/* New Chat Modal/Overlay */}
+            {/* New Chat Slide-in Panel */}
             <AnimatePresence>
                 {isNewChatOpen && (
                     <motion.div
@@ -185,48 +215,78 @@ export default function ChatSidebar({ users, currentUser, selectedUserId, onSele
                         transition={{ type: 'spring', damping: 25, stiffness: 220 }}
                         className="absolute inset-0 z-30 bg-white flex flex-col"
                     >
-                        <div className="p-4 bg-emerald-600 text-white flex items-center space-x-4 shadow-lg shadow-emerald-100">
-                            <button onClick={() => setIsNewChatOpen(false)} className="hover:bg-white/10 p-1 rounded-full transition-colors cursor-pointer">
-                                <X size={24} />
+                        {/* Panel Header */}
+                        <div className="p-4 bg-emerald-600 text-white flex items-center space-x-4 shadow-lg">
+                            <button
+                                onClick={() => { setIsNewChatOpen(false); setNewChatSearch(''); }}
+                                className="hover:bg-white/10 p-1.5 rounded-full transition-colors cursor-pointer"
+                            >
+                                <X size={22} />
                             </button>
                             <h2 className="font-bold text-lg">New Message</h2>
                         </div>
 
-                        <div className="p-3">
+                        {/* Panel Search — uses its own state, NOT the main searchTerm */}
+                        <div className="p-3 bg-emerald-50 border-b border-emerald-100">
                             <div className="relative group">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors" size={16} />
                                 <input
                                     type="text"
                                     placeholder="Search people..."
-                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white transition-all outline-hidden"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-emerald-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-hidden"
                                     autoFocus
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    value={newChatSearch}
+                                    onChange={(e) => setNewChatSearch(e.target.value)}
                                 />
                             </div>
                         </div>
 
+                        {/* Contacts List */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
-                            <div className="px-5 py-3 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/50 mb-2">
-                                Contacts
+                            <div className="px-5 py-2.5 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/50 border-b border-emerald-50">
+                                All Contacts — {allContacts.length}
                             </div>
-                            {users.filter(u => u.id !== currentUser.id).map(user => (
-                                <div
+                            {allContacts.length > 0 ? allContacts.map(user => (
+                                <motion.div
                                     key={user.id}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => {
                                         onSelectUser(user.id);
                                         setIsNewChatOpen(false);
+                                        setNewChatSearch('');
                                     }}
-                                    className="flex items-center p-3.5 mx-2 my-1 hover:bg-slate-50 rounded-xl cursor-pointer transition-all border-b border-slate-50/50"
+                                    className="flex items-center p-3.5 mx-2 my-1 hover:bg-emerald-50 rounded-xl cursor-pointer transition-all"
                                 >
-                                    <div className="w-11 h-11 rounded-full bg-linear-to-br from-slate-100 to-slate-200 border border-slate-200/50 flex items-center justify-center text-slate-500 font-bold shadow-xs">
-                                        {user.name.charAt(0)}
+                                    <div className="relative shrink-0">
+                                        <div className="w-11 h-11 rounded-full bg-linear-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold shadow-sm">
+                                            {user.name.charAt(0)}
+                                        </div>
+                                        {user.status?.isOnline && (
+                                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+                                        )}
                                     </div>
-                                    <div className="ml-3">
+                                    <div className="ml-3 flex-1 min-w-0">
                                         <h3 className="text-sm font-bold text-slate-800">{user.name}</h3>
-                                        <p className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">{user.username}</p>
+                                        <p className="text-[10px] font-semibold">
+                                            {user.status?.isOnline ? (
+                                                <span className="text-emerald-500">● Online</span>
+                                            ) : (
+                                                <span className="text-slate-400">@{user.username}</span>
+                                            )}
+                                        </p>
                                     </div>
+                                    {(user.lastMessage || user.lastFileUrl) && (
+                                        <span className="text-[9px] text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full font-bold border border-indigo-100">
+                                            Chat exists
+                                        </span>
+                                    )}
+                                </motion.div>
+                            )) : (
+                                <div className="flex flex-col items-center justify-center py-16 text-slate-400 text-center">
+                                    <UserPlus size={40} className="text-slate-200 mb-4" />
+                                    <p className="text-sm font-semibold">No contacts found</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </motion.div>
                 )}
