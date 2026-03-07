@@ -223,6 +223,7 @@ async function main() {
   }
 
   console.log("Seeding completed successfully.");
+  process.exit(0);
 }
 
 main()
@@ -230,7 +231,4 @@ main()
     console.error("Seeding failed:");
     console.error(e);
     process.exit(1);
-  })
-  .finally(() => {
-    process.exit(0);
   });

@@ -47,3 +47,36 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
   return payload as T;
 }
+
+export async function fileUpload<T>(path: string, formData: FormData, token?: string | null): Promise<T> {
+  const baseUrl = getApiBaseUrl();
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${baseUrl}${normalizedPath}`;
+
+  const headers: Record<string, string> = {
+    // Note: Do NOT set Content-Type for FormData, the browser/native fetch will set it correctly with Boundary
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  const raw = await response.text();
+  const payload = raw ? JSON.parse(raw) : null;
+
+  if (!response.ok) {
+    const message =
+      payload?.message ||
+      payload?.error ||
+      `Upload failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  return payload as T;
+}

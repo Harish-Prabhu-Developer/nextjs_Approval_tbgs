@@ -1,11 +1,10 @@
-import { db } from './index';
-import { sql } from 'drizzle-orm';
+import { sql } from "drizzle-orm";
+import { db } from "./index";
 
 async function reset() {
-  console.log('🗑️  Dropping all tables in the public schema...');
-  
+  console.log("Dropping all tables in the public schema...");
+
   try {
-    // This script drops all tables in the public schema of a PostgreSQL database
     await db.execute(sql`
       DO $$ DECLARE
         r RECORD;
@@ -15,12 +14,12 @@ async function reset() {
         END LOOP;
       END $$;
     `);
-    
-    console.log('✅ All tables dropped successfully!');
-  } catch (error) {
-    console.error('❌ Failed to drop tables:', error);
-  } finally {
+
+    console.log("All tables dropped successfully.");
     process.exit(0);
+  } catch (error) {
+    console.error("Failed to drop tables:", error);
+    process.exit(1);
   }
 }
 

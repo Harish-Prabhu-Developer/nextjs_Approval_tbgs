@@ -11,4 +11,6 @@ export type DrawerParamList = {
   PriceApproval: { title: string; subtitle?: string; routeSlug: string };
   SalesReturn: { title: string; subtitle?: string; routeSlug: string };
   ViewDetail: { id: any; approvalType: string; item: any };
+  ChatList: undefined;
+  ChatDetail: { userId: number; name: string };
 };

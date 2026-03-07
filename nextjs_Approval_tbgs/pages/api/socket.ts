@@ -9,31 +9,39 @@ import { eq } from 'drizzle-orm';
 export const config = {
   api: {
     bodyParser: false,
+    externalResolver: true, // Recommended for Socket.IO in Next.js
   },
+};
+
+// Global for development to prevent multiple IO instances on HMR
+const globalForIo = global as unknown as {
+  io: ServerIO | undefined;
 };
 
 const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
   if (!res.socket.server.io) {
-    console.log('*First use, starting socket.io');
+    console.log('Socket: Initializing new Socket.IO server...');
 
     const httpServer: NetServer = res.socket.server as any;
     const io = new ServerIO(httpServer, {
       path: '/api/socket',
       addTrailingSlash: false,
+      pingTimeout: 120000,   // High timeout for slow dev server
+      pingInterval: 25000,
+      cors: { origin: '*', methods: ['GET', 'POST'] },
     });
 
     io.on('connection', (socket) => {
       console.log('Socket connected:', socket.id);
 
       socket.on('join', async (userIdParam: any) => {
-        const userId = Number(userIdParam);
+        const userId = Number(userIdParam?.userId || userIdParam); // Support both formats
         if (isNaN(userId)) return;
 
         socket.data.userId = userId;
-        socket.join(`user-${userId}`); // Join personal room
+        socket.join(`user-${userId}`);
         console.log(`User ${userId} joined room user-${userId}`);
         
-        // Update user status in DB
         try {
             await db.insert(userStatus).values({
                 userId,
@@ -44,7 +52,6 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
                 set: { isOnline: true, lastSeen: new Date() }
             });
             
-            // Broadcast status update to everyone
             io.emit('status-update', { userId, isOnline: true });
         } catch (err) {
             console.error("Error updating user status:", err);
@@ -52,44 +59,37 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
       });
 
       socket.on('send-message', (data) => {
-        // Target receiver and sender securely via rooms
-        const receiverRoom = `user-${Number(data.receiverId)}`;
-        const senderRoom = `user-${Number(data.senderId)}`;
-        
-        io.to(receiverRoom).to(senderRoom).emit('new-message', data);
+        const rId = Number(data.receiverId);
+        const sId = Number(data.senderId);
+        io.to(`user-${rId}`).to(`user-${sId}`).emit('new-message', data);
       });
 
       socket.on('typing', ({ receiverId, typing, userId }) => {
         const targetRoom = `user-${Number(receiverId)}`;
         io.to(targetRoom).emit('user-typing', { userId, typing });
 
-        // Server-side safety: auto-clear typing after 5s in case client goes silent
+        // Auto-clear helper
         if (typing) {
             const key = `typing_${socket.id}_${receiverId}`;
-            if ((socket as any)._typingTimers?.[key]) {
-                clearTimeout((socket as any)._typingTimers[key]);
-            }
-            if (!(socket as any)._typingTimers) (socket as any)._typingTimers = {};
-            (socket as any)._typingTimers[key] = setTimeout(() => {
+            const typingTimers = (socket as any)._typingTimers || {};
+            if (typingTimers[key]) clearTimeout(typingTimers[key]);
+            
+            typingTimers[key] = setTimeout(() => {
                 io.to(targetRoom).emit('user-typing', { userId, typing: false });
+                delete typingTimers[key];
             }, 5000);
+            (socket as any)._typingTimers = typingTimers;
         }
       });
 
       socket.on('messages-read', ({ senderId, receiverId }) => {
         const sId = Number(senderId);
         const rId = Number(receiverId);
-        
-        // Notify both parties (Sender to update ticks, Receiver to sync other tabs)
-        io.to(`user-${sId}`).to(`user-${rId}`).emit('on-messages-read', { 
-            senderId: sId, 
-            receiverId: rId 
-        });
+        io.to(`user-${sId}`).to(`user-${rId}`).emit('on-messages-read', { senderId: sId, receiverId: rId });
       });
 
       socket.on('delete-message', ({ messageId, receiverId }) => {
-        const targetRoom = `user-${Number(receiverId)}`;
-        io.to(targetRoom).emit('message-deleted', { messageId });
+        io.to(`user-${Number(receiverId)}`).emit('message-deleted', { messageId });
       });
 
       socket.on('disconnect', async () => {
@@ -100,16 +100,22 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
             await db.update(userStatus)
                 .set({ isOnline: false, lastSeen: new Date() })
                 .where(eq(userStatus.userId, userId));
-            
             io.emit('status-update', { userId, isOnline: false });
           } catch (err) {
             console.error("Error updating disconnect status:", err);
           }
         }
+        
+        // Clean up typing timers
+        const typingTimers = (socket as any)._typingTimers;
+        if (typingTimers) {
+            Object.values(typingTimers).forEach((t: any) => clearTimeout(t));
+        }
       });
     });
 
     res.socket.server.io = io;
+    globalForIo.io = io;
   }
   res.end();
 };

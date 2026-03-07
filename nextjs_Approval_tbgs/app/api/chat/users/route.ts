@@ -3,6 +3,9 @@ import { db } from '@/db';
 import { users, userStatus, chatMessages } from '@/db/schema';
 import { eq, or, and, count, desc, sql } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
@@ -13,30 +16,27 @@ export async function GET(req: Request) {
             return NextResponse.json({ message: 'Current User ID is required' }, { status: 400 });
         }
 
-        // 1. Fetch all users except current one
-        const allUsers = await db.select().from(users).where(sql`${users.id} != ${currentUserId}`);
-        
-        // 2. Fetch all statuses
-        const statuses = await db.select().from(userStatus);
+        // 1. Fetch other users with status join
+        const otherUsers = await db.select({
+            id: users.id,
+            name: users.name,
+            username: users.username,
+            email: users.email,
+            updatedAt: users.updatedAt,
+            createdAt: users.createdAt,
+            status: {
+                isOnline: userStatus.isOnline,
+                lastSeen: userStatus.lastSeen
+            }
+        })
+        .from(users)
+        .leftJoin(userStatus, eq(users.id, userStatus.userId))
+        .where(sql`${users.id} != ${currentUserId}`);
 
-        // 3. To avoid N+1 query problem, fetch last messages and unread counts in bulk
-        // For a small/medium number of users, we'll process with separate queries to keep it simple and readable
-        // but avoid doing it inside a loop that calls the database for every user.
-        
-        // Let's get all last messages for the current user in one go
-        // We'll use a subquery approach to get the latest message for each conversation
-        const lastMessages = await db.select()
-            .from(chatMessages)
-            .where(
-                or(
-                    eq(chatMessages.senderId, currentUserId),
-                    eq(chatMessages.receiverId, currentUserId)
-                )
-            )
-            .orderBy(desc(chatMessages.createdAt));
+        if (otherUsers.length === 0) return NextResponse.json([]);
 
-        // Get unread counts for all users sending to current user
-        const unreadCounts = await db.select({
+        // 2. Fetch unread counts
+        const unreadCountsResults = await db.select({
             senderId: chatMessages.senderId,
             unreadCount: count()
         })
@@ -49,15 +49,29 @@ export async function GET(req: Request) {
         )
         .groupBy(chatMessages.senderId);
 
-        const usersWithMetadata = allUsers.map((u) => {
-            // Find last message with this user
-            const lastMsg = lastMessages.find(m => 
-                (m.senderId === currentUserId && m.receiverId === u.id) || 
-                (m.senderId === u.id && m.receiverId === currentUserId)
-            );
+        // 3. Fetch latest message per conversation
+        const conversations = await db.select()
+            .from(chatMessages)
+            .where(
+                or(
+                    eq(chatMessages.senderId, currentUserId),
+                    eq(chatMessages.receiverId, currentUserId)
+                )
+            )
+            .orderBy(desc(chatMessages.createdAt));
 
-            // Find unread count for this user
-            const unread = unreadCounts.find(c => c.senderId === u.id);
+        const latestMsgMap = new Map();
+        conversations.forEach(m => {
+            const otherId = m.senderId === currentUserId ? m.receiverId : m.senderId;
+            if (!latestMsgMap.has(otherId)) {
+                latestMsgMap.set(otherId, m);
+            }
+        });
+
+        // 4. Map results
+        const results = otherUsers.map((u) => {
+            const lastMsg = latestMsgMap.get(u.id);
+            const unread = unreadCountsResults.find(c => c.senderId === u.id);
 
             return {
                 ...u,
@@ -66,15 +80,14 @@ export async function GET(req: Request) {
                 lastFileUrl: lastMsg?.fileUrl || null,
                 lastFileType: lastMsg?.fileType || null,
                 unreadCount: Number(unread?.unreadCount || 0),
-                status: statuses.find(s => s.userId === u.id) || { 
+                status: u.status || { 
                     isOnline: false, 
                     lastSeen: u.updatedAt || u.createdAt || new Date().toISOString()
                 }
             };
         });
 
-        // Sort by last message time
-        const results = usersWithMetadata.sort((a, b) => {
+        results.sort((a, b) => {
             const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
             const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
             return timeB - timeA;

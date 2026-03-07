@@ -6,7 +6,7 @@ import ChatWindow from './components/ChatWindow';
 import { useSocket } from './hooks/useSocket';
 import { useAppSelector } from '@/redux/hooks';
 import axios from 'axios';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ChatPage() {
     const { user: currentUser } = useAppSelector((state: any) => state.auth);
@@ -16,20 +16,29 @@ export default function ChatPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isTyping, setIsTyping] = useState(false);
 
-    // Ref-based ID tracking for socket closure scope
+    // Stable Refs
     const selectedUserRef = useRef<number | null>(null);
+    const socketRef = useRef<any>(null);
+    const readInProgressRef = useRef<Set<number>>(new Set());
+    const lastFetchTimeRef = useRef<number>(0);
+
     useEffect(() => {
         selectedUserRef.current = selectedUserId;
     }, [selectedUserId]);
 
     const { socket, isConnected } = useSocket(currentUser?.id);
 
+    useEffect(() => {
+        socketRef.current = socket;
+    }, [socket]);
+
     const fetchUsers = useCallback(async () => {
         if (!currentUser?.id) return;
         try {
-            const res = await axios.get(`/api/chat/users?currentUserId=${currentUser.id}`);
+            const res = await axios.get(`/api/chat/users?currentUserId=${currentUser.id}&t=${Date.now()}`);
             setUsers(res.data);
             setIsLoading(false);
+            lastFetchTimeRef.current = Date.now();
         } catch (err) {
             console.error("Error fetching users:", err);
             setIsLoading(false);
@@ -37,86 +46,89 @@ export default function ChatPage() {
     }, [currentUser?.id]);
 
     const markAsRead = useCallback(async (senderId: number) => {
-        if (!currentUser?.id || !socket) return;
+        if (!currentUser?.id || readInProgressRef.current.has(senderId)) return;
         try {
             const sId = Number(senderId);
             const rId = Number(currentUser.id);
+            readInProgressRef.current.add(sId);
 
-            // 1. Mark in Database
-            await axios.post('/api/chat/read', {
-                senderId: sId,
-                receiverId: rId
-            });
-
-            // 2. Immediate Local Sidebar Update
             setUsers(prev => prev.map(u => u.id === sId ? { ...u, unreadCount: 0 } : u));
+            setMessages(prev => prev.map(m => (m.senderId === sId && !m.isRead) ? { ...m, isRead: true } : m));
 
-            // 3. Broadcast to Socket (server handles notifying relevant parties)
-            socket.emit('messages-read', {
-                senderId: sId,
-                receiverId: rId
-            });
+            await axios.post('/api/chat/read', { senderId: sId, receiverId: rId });
+
+            if (socketRef.current) {
+                socketRef.current.emit('messages-read', { senderId: sId, receiverId: rId });
+            }
         } catch (err) {
             console.error("Error marking messages as read:", err);
+        } finally {
+            readInProgressRef.current.delete(senderId);
         }
-    }, [currentUser?.id, socket]);
+    }, [currentUser?.id]);
 
     const fetchMessages = useCallback(async (userId2: number) => {
         if (!currentUser?.id) return;
         try {
-            const res = await axios.get(`/api/chat/messages?userId1=${currentUser.id}&userId2=${userId2}`);
+            const res = await axios.get(`/api/chat/messages?userId1=${currentUser.id}&userId2=${userId2}&t=${Date.now()}`);
             setMessages(res.data);
 
-            // Initial read mark on open
-            markAsRead(userId2);
+            const hasUnread = res.data.some((m: any) => !m.isRead && Number(m.senderId) === Number(userId2));
+            if (hasUnread) {
+                markAsRead(userId2);
+            }
         } catch (err) {
             console.error("Error fetching messages:", err);
         }
     }, [currentUser?.id, markAsRead]);
 
     useEffect(() => {
-        if (currentUser) {
-            fetchUsers();
-        }
+        if (currentUser) fetchUsers();
     }, [currentUser, fetchUsers]);
 
     useEffect(() => {
         if (selectedUserId !== null) {
             setMessages([]);
-            setIsTyping(false); // Reset typing state when switching chats
+            setIsTyping(false);
             fetchMessages(selectedUserId);
         }
     }, [selectedUserId, fetchMessages]);
 
-    // Ensure we mark as read if socket connects AFTER a user was already selected
     useEffect(() => {
-        if (isConnected && selectedUserId !== null) {
-            markAsRead(selectedUserId);
+        if (isConnected && currentUser?.id) {
+            fetchUsers();
+            if (selectedUserRef.current) fetchMessages(selectedUserRef.current);
         }
-    }, [isConnected, selectedUserId, markAsRead]);
+    }, [isConnected, currentUser?.id, fetchUsers, fetchMessages]);
 
-    // Focus listener fail-safe
     useEffect(() => {
         const handleFocus = () => {
-            if (selectedUserRef.current !== null) {
-                markAsRead(selectedUserRef.current);
-            }
+            if (selectedUserRef.current !== null) markAsRead(selectedUserRef.current);
         };
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
     }, [markAsRead]);
 
+    // Typing Emit Logic - Relaxed connection check
+    const handleTyping = useCallback((isTypingStatus: boolean) => {
+        if (socketRef.current && selectedUserRef.current !== null) {
+            socketRef.current.emit('typing', {
+                receiverId: selectedUserRef.current,
+                userId: currentUser?.id,
+                typing: isTypingStatus
+            });
+        }
+    }, [currentUser?.id]);
+
     useEffect(() => {
         if (!socket) return;
 
-        socket.on('new-message', (data) => {
-            console.log("Socket: new-message received", data);
+        const handleNewMessage = (data: any) => {
             const activeId = selectedUserRef.current;
             const myId = Number(currentUser?.id);
             const dataSId = Number(data.senderId);
             const dataRId = Number(data.receiverId);
 
-            // 1. Update User List (Snippets and Unread Counts)
             setUsers(prev => prev.map(u => {
                 const isRelevantUser = (u.id === dataSId || u.id === dataRId) && u.id !== myId;
                 if (!isRelevantUser) return u;
@@ -130,79 +142,77 @@ export default function ChatPage() {
                     lastMessageTime: data.createdAt,
                     lastFileUrl: data.fileUrl,
                     lastFileType: data.fileType,
+                    isTyping: isIncomingMessage ? false : u.isTyping, // Instant clear
                     unreadCount: (isIncomingMessage && !isCurrentlyChatting)
                         ? (u.unreadCount || 0) + 1
                         : 0
                 };
             }));
 
-            // 2. Update Chat Window (Messages)
             const isForThisChat = (dataRId === myId && dataSId === activeId) || (dataSId === myId && dataRId === activeId);
             if (isForThisChat) {
                 setMessages(prev => {
                     const msgId = Number(data.id);
-                    if (prev.find(m => Number(m.id) === msgId)) return prev;
-                    const finalMsg = (dataRId === myId) ? { ...data, isRead: true } : data;
-                    return [...prev, finalMsg];
+                    const idx = prev.findIndex(m =>
+                        (msgId !== 0 && Number(m.id) === msgId) ||
+                        (!!data.clientMessageId && m.clientMessageId === data.clientMessageId)
+                    );
+                    const normalized = {
+                        ...data,
+                        isRead: (dataRId === myId && dataSId === activeId) ? true : data.isRead
+                    };
+                    if (idx === -1) return [...prev, normalized];
+                    return prev.map((m, i) => i === idx ? { ...m, ...normalized, isSending: false } : m);
                 });
 
-                // Clear typing indicator when a message arrives
                 if (dataSId === activeId) {
                     setIsTyping(false);
-                    setUsers(prev => prev.map(u => u.id === dataSId ? { ...u, isTyping: false } : u));
-                }
-
-                // 3. Trigger markAsRead if I just received a message while active
-                if (dataRId === myId && activeId !== null) {
-                    markAsRead(activeId);
+                    if (dataRId === myId) markAsRead(activeId);
                 }
             }
-        });
+        };
 
-        socket.on('on-messages-read', ({ senderId, receiverId }) => {
-            console.log("Socket: on-messages-read received", { senderId, receiverId });
+        const handleMessagesRead = ({ senderId, receiverId }: any) => {
             const myId = Number(currentUser?.id);
             const activeId = Number(selectedUserRef.current);
-            const sId = Number(senderId); // The person whose messages were read
-            const rId = Number(receiverId); // The person who read them
+            const sIdNum = Number(senderId);
+            const rIdNum = Number(receiverId);
 
-            // 1. Sync messages in the chat window
-            // If the chat currently open is the one that was just read (by either person)
-            const isThisConversation = (sId === myId && rId === activeId) || (sId === activeId && rId === myId);
-            if (isThisConversation) {
-                setMessages(prev => {
-                    const needsUpdate = prev.some(m => !m.isRead);
-                    if (!needsUpdate) return prev;
-                    return prev.map(m => !m.isRead ? { ...m, isRead: true } : m);
-                });
+            if ((sIdNum === myId && rIdNum === activeId) || (sIdNum === activeId && rIdNum === myId)) {
+                setMessages(prev => prev.map(m => !m.isRead ? { ...m, isRead: true } : m));
             }
-
-            // 2. Clear unread count in the sidebar for the reader
-            if (rId === myId) {
-                setUsers(prev => prev.map(u => u.id === sId ? { ...u, unreadCount: 0 } : u));
+            if (rIdNum === myId) {
+                setUsers(prev => prev.map(u => u.id === sIdNum ? { ...u, unreadCount: 0 } : u));
             }
-        });
+        };
 
-        socket.on('status-update', ({ userId, isOnline }) => {
+        const handleStatusUpdate = ({ userId, isOnline }: any) => {
             const uId = Number(userId);
-            setUsers(prev => prev.map(u =>
-                u.id === uId ? { ...u, status: { ...u.status, isOnline } } : u
-            ));
-        });
+            setUsers(prev => prev.map(u => u.id === uId ? { ...u, status: { ...u.status, isOnline } } : u));
+        };
 
-        socket.on('user-typing', ({ userId, typing }) => {
-            const uId = Number(userId);
-            // Only update isTyping state if the typing person is the one we're currently chatting with
+        const handleTypingEvent = (data: any) => {
+            const uId = Number(data.userId);
+            const typing = Boolean(data.typing);
+
+            // 1. Update status in the users list (for sidebar dots/indicators)
             setUsers(prev => prev.map(u => u.id === uId ? { ...u, isTyping: typing } : u));
+
+            // 2. Update the active chat window indicator
             if (uId === selectedUserRef.current) {
                 setIsTyping(typing);
             }
-        });
+        };
 
-        socket.on('message-deleted', ({ messageId }) => {
-            console.log("Socket: message-deleted received", messageId);
+        const handleMessageDeleted = ({ messageId }: any) => {
             setMessages(prev => prev.filter(m => Number(m.id) !== Number(messageId)));
-        });
+        };
+
+        socket.on('new-message', handleNewMessage);
+        socket.on('on-messages-read', handleMessagesRead);
+        socket.on('status-update', handleStatusUpdate);
+        socket.on('user-typing', handleTypingEvent);
+        socket.on('message-deleted', handleMessageDeleted);
 
         return () => {
             socket.off('new-message');
@@ -215,153 +225,69 @@ export default function ChatPage() {
 
     const handleSendMessage = async (text: string, fileData?: any) => {
         if (!selectedUserId || !currentUser?.id) return;
-
         const myId = Number(currentUser.id);
         const contactId = Number(selectedUserId);
-        const tempId = Date.now();
+        const clientMessageId = `${myId}-${contactId}-${Date.now()}`;
 
-        // Handle File Upload Optimistically
         let localFileUrl = fileData?.fileUrl;
-        if (fileData?.fileObject) {
-            localFileUrl = URL.createObjectURL(fileData.fileObject);
-        }
+        if (fileData?.fileObject) localFileUrl = URL.createObjectURL(fileData.fileObject);
 
         const optimisticMsg = {
-            id: tempId,
-            senderId: myId,
-            receiverId: contactId,
-            message: text,
-            fileUrl: localFileUrl,
-            fileName: fileData?.fileName,
-            fileType: fileData?.fileType,
-            createdAt: new Date(), // Using Date object for local consistency
-            isSending: true,
-            isRead: false,
-            replyTo: fileData?.replyTo
+            id: Date.now(), senderId: myId, receiverId: contactId, message: text,
+            fileUrl: localFileUrl, fileName: fileData?.fileName, fileType: fileData?.fileType,
+            createdAt: new Date().toISOString(), isSending: true, isRead: false,
+            clientMessageId, replyTo: fileData?.replyTo
         };
 
         setMessages(prev => [...prev, optimisticMsg]);
+        handleTyping(false); // Clear typing instantly locally
 
         try {
             let finalFileData = { ...fileData };
-
-            // 1. Perform Upload if there's a file
             if (fileData?.fileObject) {
                 const formData = new FormData();
                 formData.append('file', fileData.fileObject);
-                const uploadRes = await axios.post('/api/chat/upload', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-                finalFileData = {
-                    fileUrl: uploadRes.data.fileUrl,
-                    fileName: uploadRes.data.fileName,
-                    fileType: uploadRes.data.fileType
-                };
+                const uploadRes = await axios.post('/api/chat/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                finalFileData = { fileUrl: uploadRes.data.fileUrl, fileName: uploadRes.data.fileName, fileType: uploadRes.data.fileType };
+                if (localFileUrl) URL.revokeObjectURL(localFileUrl);
             }
 
-            // 2. Persist Message
             const res = await axios.post('/api/chat/messages', {
-                senderId: myId,
-                receiverId: contactId,
-                message: text,
-                fileUrl: finalFileData.fileUrl,
-                fileName: finalFileData.fileName,
-                fileType: finalFileData.fileType,
-                replyTo: fileData?.replyTo
+                senderId: myId, receiverId: contactId, message: text,
+                fileUrl: finalFileData.fileUrl, fileName: finalFileData.fileName, fileType: finalFileData.fileType,
+                replyTo: fileData?.replyTo, clientMessageId
             });
 
-            // 3. Clean up the local blob URL if we created one
-            if (fileData?.fileObject && localFileUrl) {
-                URL.revokeObjectURL(localFileUrl);
+            if (socketRef.current) {
+                socketRef.current.emit('send-message', res.data);
             }
 
-            if (socket) {
-                socket.emit('send-message', res.data);
-            }
-
-            setMessages(prev => prev.map(m => {
-                if (m.id === tempId) {
-                    return { ...res.data, isRead: m.isRead || res.data.isRead };
-                }
-                return m;
-            }));
-
-            setUsers(prev => prev.map(u =>
-                u.id === contactId ? {
-                    ...u,
-                    lastMessage: text,
-                    lastMessageTime: new Date(),
-                    lastFileUrl: finalFileData.fileUrl,
-                    lastFileType: finalFileData.fileType
-                } : u
-            ));
+            setMessages(prev => prev.map(m => m.clientMessageId === clientMessageId ? { ...res.data, isSending: false } : m));
+            setUsers(prev => prev.map(u => u.id === contactId ? { ...u, lastMessage: text, lastMessageTime: new Date().toISOString(), unreadCount: 0 } : u));
         } catch (err) {
             console.error("Error sending message:", err);
-            // If upload fails and we had a local URL, clean it up
-            if (fileData?.fileObject && localFileUrl) {
-                URL.revokeObjectURL(localFileUrl);
-            }
-            setMessages(prev => prev.filter(m => m.id !== tempId));
-        }
-    };
-
-    const handleTyping = (isTypingStatus: boolean) => {
-        if (socket && selectedUserId !== null) {
-            socket.emit('typing', {
-                receiverId: selectedUserId,
-                userId: currentUser.id,
-                typing: isTypingStatus
-            });
+            if (localFileUrl) URL.revokeObjectURL(localFileUrl);
+            setMessages(prev => prev.filter(m => m.clientMessageId !== clientMessageId));
         }
     };
 
     if (!currentUser) return null;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex h-[calc(100vh-160px)] md:h-[calc(100vh-100px)] bg-white rounded-2xl shadow-2xl shadow-indigo-100/40 overflow-hidden border border-slate-100 relative"
-        >
-            <div className={`${selectedUserId ? 'hidden md:flex' : 'flex'} w-full md:w-80 h-full border-r border-slate-100`}>
-                <ChatSidebar
-                    users={users}
-                    currentUser={currentUser}
-                    selectedUserId={selectedUserId}
-                    onSelectUser={setSelectedUserId}
-                    isLoading={isLoading}
-                />
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex h-[calc(100vh-160px)] md:h-[calc(100vh-100px)] bg-white rounded-2xl shadow-2xl shadow-indigo-100/40 overflow-hidden border border-slate-100 relative">
+            <div className={`${selectedUserId ? 'hidden md:flex' : 'flex'} w-full md:w-85 h-full border-r border-slate-100 bg-slate-50/30`}>
+                <ChatSidebar users={users} currentUser={currentUser} selectedUserId={selectedUserId} onSelectUser={setSelectedUserId} isLoading={isLoading} />
             </div>
-
             <div className={`${selectedUserId ? 'flex' : 'hidden md:flex'} flex-1 relative flex flex-col h-full overflow-hidden bg-white`}>
-                <ChatWindow
-                    recipient={users.find(u => u.id === selectedUserId) || null}
-                    currentUser={currentUser}
-                    messages={messages}
-                    onSendMessage={handleSendMessage}
-                    onTyping={handleTyping}
-                    onClearChat={() => {
-                        setMessages([]);
-                        setUsers(prev => prev.map(u =>
-                            u.id === selectedUserId ? { ...u, lastMessage: null, lastMessageTime: null } : u
-                        ));
-                    }}
-                    onDeleteMessage={(id) => {
-                        setMessages(prev => prev.filter(m => Number(m.id) !== Number(id)));
-                        if (socket) {
-                            socket.emit('delete-message', { messageId: id, receiverId: selectedUserId });
-                        }
-                    }}
-                    isRecipientTyping={isTyping}
-                    onBack={() => setSelectedUserId(null)}
-                />
-
-                <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all duration-500 z-50 ${isConnected
-                    ? 'bg-emerald-100/50 text-emerald-600 backdrop-blur-xs opacity-0 hover:opacity-100 shadow-sm'
-                    : 'bg-red-100 text-red-600 shadow-lg'
-                    }`}>
-                    {isConnected ? '• Real-time Active' : '⚠ Syncing...'}
-                </div>
+                <ChatWindow recipient={users.find(u => u.id === selectedUserId) || null} currentUser={currentUser} messages={messages} onSendMessage={handleSendMessage} onTyping={handleTyping} onClearChat={() => { setMessages([]); fetchUsers(); }} onDeleteMessage={(id) => { setMessages(prev => prev.filter(m => Number(m.id) !== Number(id))); if (socketRef.current) { socketRef.current.emit('delete-message', { messageId: id, receiverId: selectedUserId }); } }} isRecipientTyping={isTyping} onBack={() => setSelectedUserId(null)} />
+                <AnimatePresence>
+                    {!isConnected && (
+                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-red-500 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl z-50 flex items-center space-x-2">
+                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
+                            <span>Syncing...</span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </motion.div>
     );

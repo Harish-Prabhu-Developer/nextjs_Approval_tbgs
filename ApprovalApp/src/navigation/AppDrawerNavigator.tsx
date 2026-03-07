@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
-import { Bell, BriefcaseBusiness, LayoutDashboard, LogOut, Menu, ShoppingCart, X } from 'lucide-react-native';
+import { Bell, BriefcaseBusiness, LayoutDashboard, LogOut, Menu, MessageSquare, ShoppingCart, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Breadcrumbs from '../components/Breadcrumbs';
 
@@ -14,6 +14,8 @@ import DashboardScreen from '../Screens/DashboardScreen';
 import ApprovalScreen from '../Screens/ApprovalScreen';
 import { DrawerParamList } from './types';
 import ViewDetailScreen from '../Screens/ViewDetailScreen';
+import ChatListScreen from '../Screens/ChatListScreen';
+import ChatDetailScreen from '../Screens/ChatDetailScreen';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { fetchApprovalCounts } from '../redux/slices/dashboardSlice';
 import { logoutUser } from '../redux/slices/authSlice';
@@ -113,6 +115,12 @@ function SidebarContent(
       count: 0,
       icon: LayoutDashboard,
     },
+    {
+      key: 'ChatList',
+      label: 'Messages',
+      count: 0,
+      icon: MessageSquare,
+    },
     ...DASHBOARD_CARDS.filter((card) => allowedPermissions.includes(card.permissionColumn)).map((card) => ({
       key: routeMap[card.routeSlug] || 'Dashboard',
       label: card.cardTitle,
@@ -162,8 +170,8 @@ function SidebarContent(
                 <Pressable
                   key={item.key}
                   onPress={() => {
-                    if (item.key === 'Dashboard') {
-                      navigation.navigate('Dashboard');
+                    if (item.key === 'Dashboard' || item.key === 'ChatList' || item.label === 'Messages') {
+                      navigation.navigate(item.key === 'ChatList' || item.label === 'Messages' ? 'ChatList' : 'Dashboard');
                       return;
                     }
 
@@ -325,6 +333,16 @@ export default function AppDrawerNavigator() {
         name="ViewDetail"
         component={ViewDetailScreen}
         options={{ drawerItemStyle: { display: 'none' } }}
+      />
+      <Drawer.Screen
+        name="ChatList"
+        component={ChatListScreen}
+        options={{ title: 'Messages' }}
+      />
+      <Drawer.Screen
+        name="ChatDetail"
+        component={ChatDetailScreen}
+        options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
       />
     </Drawer.Navigator>
   );

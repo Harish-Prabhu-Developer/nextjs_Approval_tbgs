@@ -1,0 +1,2048 @@
+{
+  "id": "d75a8471-e8f5-48f8-9d37-03d87bb8e29e",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.tbl_approval_details": {
+      "name": "tbl_approval_details",
+      "schema": "",
+      "columns": {
+        "sno": {
+          "name": "sno",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ref_no": {
+          "name": "ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "product_name": {
+          "name": "product_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "specification": {
+          "name": "specification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ordered_qty": {
+          "name": "ordered_qty",
+          "type": "numeric(15, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_price": {
+          "name": "unit_price",
+          "type": "numeric(15, 6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vat_amount": {
+          "name": "vat_amount",
+          "type": "numeric(15, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_approval_details_product_id_tbl_products_product_id_fk": {
+          "name": "tbl_approval_details_product_id_tbl_products_product_id_fk",
+          "tableFrom": "tbl_approval_details",
+          "tableTo": "tbl_products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "product_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_approval_requests": {
+      "name": "tbl_approval_requests",
+      "schema": "",
+      "columns": {
+        "sno": {
+          "name": "sno",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "approval_type": {
+          "name": "approval_type",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "po_ref_no": {
+          "name": "po_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "po_date": {
+          "name": "po_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purchase_type": {
+          "name": "purchase_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "supplier_id": {
+          "name": "supplier_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "po_store_id": {
+          "name": "po_store_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_entry": {
+          "name": "status_entry",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_date": {
+          "name": "created_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "modified_by": {
+          "name": "modified_by",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "modified_date": {
+          "name": "modified_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_final_production_hdr_amount": {
+          "name": "total_final_production_hdr_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency_type": {
+          "name": "currency_type",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_date": {
+          "name": "requested_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_person": {
+          "name": "response1_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_status": {
+          "name": "response1_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_date": {
+          "name": "response1_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_remarks": {
+          "name": "response1_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_person": {
+          "name": "response2_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_status": {
+          "name": "response2_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_date": {
+          "name": "response2_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_remarks": {
+          "name": "response2_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_person": {
+          "name": "final_response_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_status": {
+          "name": "final_response_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_date": {
+          "name": "final_response_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_remarks": {
+          "name": "final_response_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_term": {
+          "name": "payment_term",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mode_of_payment": {
+          "name": "mode_of_payment",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suplier_proforma_number": {
+          "name": "suplier_proforma_number",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shipment_mode": {
+          "name": "shipment_mode",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_terms": {
+          "name": "price_terms",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shipment_remarks": {
+          "name": "shipment_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_production_hdr_amount": {
+          "name": "total_production_hdr_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_additional_cost_amount": {
+          "name": "total_additional_cost_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vat_hdr_amount": {
+          "name": "vat_hdr_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_approval_requests_company_id_tbl_companies_company_id_fk": {
+          "name": "tbl_approval_requests_company_id_tbl_companies_company_id_fk",
+          "tableFrom": "tbl_approval_requests",
+          "tableTo": "tbl_companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "company_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_approval_requests_supplier_id_tbl_suppliers_supplier_id_fk": {
+          "name": "tbl_approval_requests_supplier_id_tbl_suppliers_supplier_id_fk",
+          "tableFrom": "tbl_approval_requests",
+          "tableTo": "tbl_suppliers",
+          "columnsFrom": [
+            "supplier_id"
+          ],
+          "columnsTo": [
+            "supplier_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_approval_requests_po_store_id_tbl_stores_store_id_fk": {
+          "name": "tbl_approval_requests_po_store_id_tbl_stores_store_id_fk",
+          "tableFrom": "tbl_approval_requests",
+          "tableTo": "tbl_stores",
+          "columnsFrom": [
+            "po_store_id"
+          ],
+          "columnsTo": [
+            "store_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_chat_messages": {
+      "name": "tbl_chat_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "sender_id": {
+          "name": "sender_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "receiver_id": {
+          "name": "receiver_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_url": {
+          "name": "file_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_type": {
+          "name": "file_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_read": {
+          "name": "is_read",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "reply_to": {
+          "name": "reply_to",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_chat_messages_sender_id_tbl_users_id_fk": {
+          "name": "tbl_chat_messages_sender_id_tbl_users_id_fk",
+          "tableFrom": "tbl_chat_messages",
+          "tableTo": "tbl_users",
+          "columnsFrom": [
+            "sender_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_chat_messages_receiver_id_tbl_users_id_fk": {
+          "name": "tbl_chat_messages_receiver_id_tbl_users_id_fk",
+          "tableFrom": "tbl_chat_messages",
+          "tableTo": "tbl_users",
+          "columnsFrom": [
+            "receiver_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_companies": {
+      "name": "tbl_companies",
+      "schema": "",
+      "columns": {
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_name": {
+          "name": "company_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_no": {
+          "name": "contact_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_dashboard_cards": {
+      "name": "tbl_dashboard_cards",
+      "schema": "",
+      "columns": {
+        "sno": {
+          "name": "sno",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "card_title": {
+          "name": "card_title",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "permission_column": {
+          "name": "permission_column",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_slug": {
+          "name": "route_slug",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approval_type": {
+          "name": "approval_type",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "icon_key": {
+          "name": "icon_key",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "background_color": {
+          "name": "background_color",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_main_categories": {
+      "name": "tbl_main_categories",
+      "schema": "",
+      "columns": {
+        "main_category_id": {
+          "name": "main_category_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "category_name": {
+          "name": "category_name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_products": {
+      "name": "tbl_products",
+      "schema": "",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "product_name": {
+          "name": "product_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "main_category_id": {
+          "name": "main_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sub_category_id": {
+          "name": "sub_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "specification": {
+          "name": "specification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_products_main_category_id_tbl_main_categories_main_category_id_fk": {
+          "name": "tbl_products_main_category_id_tbl_main_categories_main_category_id_fk",
+          "tableFrom": "tbl_products",
+          "tableTo": "tbl_main_categories",
+          "columnsFrom": [
+            "main_category_id"
+          ],
+          "columnsTo": [
+            "main_category_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_products_sub_category_id_tbl_sub_categories_sub_category_id_fk": {
+          "name": "tbl_products_sub_category_id_tbl_sub_categories_sub_category_id_fk",
+          "tableFrom": "tbl_products",
+          "tableTo": "tbl_sub_categories",
+          "columnsFrom": [
+            "sub_category_id"
+          ],
+          "columnsTo": [
+            "sub_category_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_purchase_order_additional_costs": {
+      "name": "tbl_purchase_order_additional_costs",
+      "schema": "",
+      "columns": {
+        "sno": {
+          "name": "sno",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "po_ref_no": {
+          "name": "po_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "additional_cost_type": {
+          "name": "additional_cost_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vat_amount": {
+          "name": "vat_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_master": {
+          "name": "status_master",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_date": {
+          "name": "created_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_purchase_order_conversation": {
+      "name": "tbl_purchase_order_conversation",
+      "schema": "",
+      "columns": {
+        "sno": {
+          "name": "sno",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "po_ref_no": {
+          "name": "po_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "respond_person": {
+          "name": "respond_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discussion_details": {
+          "name": "discussion_details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response_status": {
+          "name": "response_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_entry": {
+          "name": "status_entry",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_date": {
+          "name": "created_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_purchase_order_dtl": {
+      "name": "tbl_purchase_order_dtl",
+      "schema": "",
+      "columns": {
+        "sno": {
+          "name": "sno",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "po_ref_no": {
+          "name": "po_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_store_id": {
+          "name": "request_store_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "po_request_ref_no": {
+          "name": "po_request_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proforma_invoice_ref_no": {
+          "name": "proforma_invoice_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "section_id": {
+          "name": "section_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "machine_id": {
+          "name": "machine_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "main_category_id": {
+          "name": "main_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sub_category_id": {
+          "name": "sub_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "packing_type": {
+          "name": "packing_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "no_pcs_per_packing": {
+          "name": "no_pcs_per_packing",
+          "type": "numeric(15, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_pcs": {
+          "name": "total_pcs",
+          "type": "numeric(15, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_packing": {
+          "name": "total_packing",
+          "type": "numeric(15, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_per_pcs": {
+          "name": "rate_per_pcs",
+          "type": "numeric(15, 6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "product_amount": {
+          "name": "product_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_percentage": {
+          "name": "discount_percentage",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_amount": {
+          "name": "discount_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_product_amount": {
+          "name": "total_product_amount",
+          "type": "numeric(15, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vat_percentage": {
+          "name": "vat_percentage",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vat_amount": {
+          "name": "vat_amount",
+          "type": "numeric(15, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_product_amount": {
+          "name": "final_product_amount",
+          "type": "numeric(15, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_entry": {
+          "name": "status_entry",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_date": {
+          "name": "created_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alternate_product_name": {
+          "name": "alternate_product_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lc_needed_status": {
+          "name": "lc_needed_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lc_apply_status": {
+          "name": "lc_apply_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lc_applied_date": {
+          "name": "lc_applied_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lc_no": {
+          "name": "lc_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sup_doc_file": {
+          "name": "sup_doc_file",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "truck_id": {
+          "name": "truck_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trailer_id": {
+          "name": "trailer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_person": {
+          "name": "response1_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_date": {
+          "name": "response1_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_status": {
+          "name": "response1_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_remarks": {
+          "name": "response1_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_approved_total_packing": {
+          "name": "response1_approved_total_packing",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_approved_total_pcs": {
+          "name": "response1_approved_total_pcs",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_person": {
+          "name": "response2_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_date": {
+          "name": "response2_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_status": {
+          "name": "response2_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_remarks": {
+          "name": "response2_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_approved_total_packing": {
+          "name": "response2_approved_total_packing",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_approved_total_pcs": {
+          "name": "response2_approved_total_pcs",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_person": {
+          "name": "final_response_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_date": {
+          "name": "final_response_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_status": {
+          "name": "final_response_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_remarks": {
+          "name": "final_response_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_approved_total_packing": {
+          "name": "final_response_approved_total_packing",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_approved_total_pcs": {
+          "name": "final_response_approved_total_pcs",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_purchase_order_dtl_request_store_id_tbl_stores_store_id_fk": {
+          "name": "tbl_purchase_order_dtl_request_store_id_tbl_stores_store_id_fk",
+          "tableFrom": "tbl_purchase_order_dtl",
+          "tableTo": "tbl_stores",
+          "columnsFrom": [
+            "request_store_id"
+          ],
+          "columnsTo": [
+            "store_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_purchase_order_dtl_main_category_id_tbl_main_categories_main_category_id_fk": {
+          "name": "tbl_purchase_order_dtl_main_category_id_tbl_main_categories_main_category_id_fk",
+          "tableFrom": "tbl_purchase_order_dtl",
+          "tableTo": "tbl_main_categories",
+          "columnsFrom": [
+            "main_category_id"
+          ],
+          "columnsTo": [
+            "main_category_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_purchase_order_dtl_sub_category_id_tbl_sub_categories_sub_category_id_fk": {
+          "name": "tbl_purchase_order_dtl_sub_category_id_tbl_sub_categories_sub_category_id_fk",
+          "tableFrom": "tbl_purchase_order_dtl",
+          "tableTo": "tbl_sub_categories",
+          "columnsFrom": [
+            "sub_category_id"
+          ],
+          "columnsTo": [
+            "sub_category_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_purchase_order_dtl_product_id_tbl_products_product_id_fk": {
+          "name": "tbl_purchase_order_dtl_product_id_tbl_products_product_id_fk",
+          "tableFrom": "tbl_purchase_order_dtl",
+          "tableTo": "tbl_products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "product_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_purchase_order_dtl_truck_id_tbl_trucks_truck_id_fk": {
+          "name": "tbl_purchase_order_dtl_truck_id_tbl_trucks_truck_id_fk",
+          "tableFrom": "tbl_purchase_order_dtl",
+          "tableTo": "tbl_trucks",
+          "columnsFrom": [
+            "truck_id"
+          ],
+          "columnsTo": [
+            "truck_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_purchase_order_dtl_trailer_id_tbl_trailers_trailer_id_fk": {
+          "name": "tbl_purchase_order_dtl_trailer_id_tbl_trailers_trailer_id_fk",
+          "tableFrom": "tbl_purchase_order_dtl",
+          "tableTo": "tbl_trailers",
+          "columnsFrom": [
+            "trailer_id"
+          ],
+          "columnsTo": [
+            "trailer_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_purchase_order_files": {
+      "name": "tbl_purchase_order_files",
+      "schema": "",
+      "columns": {
+        "sno": {
+          "name": "sno",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "po_ref_no": {
+          "name": "po_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description_details": {
+          "name": "description_details",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content_data": {
+          "name": "content_data",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_master": {
+          "name": "status_master",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_date": {
+          "name": "created_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_type": {
+          "name": "file_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_purchase_order_hdr": {
+      "name": "tbl_purchase_order_hdr",
+      "schema": "",
+      "columns": {
+        "sno": {
+          "name": "sno",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "po_ref_no": {
+          "name": "po_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "po_date": {
+          "name": "po_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purchase_type": {
+          "name": "purchase_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "supplier_id": {
+          "name": "supplier_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "po_store_id": {
+          "name": "po_store_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_entry": {
+          "name": "status_entry",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_date": {
+          "name": "created_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "modified_by": {
+          "name": "modified_by",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "modified_date": {
+          "name": "modified_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_term": {
+          "name": "payment_term",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mode_of_payment": {
+          "name": "mode_of_payment",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency_type": {
+          "name": "currency_type",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suplier_proforma_number": {
+          "name": "suplier_proforma_number",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shipment_mode": {
+          "name": "shipment_mode",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_terms": {
+          "name": "price_terms",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shipment_remarks": {
+          "name": "shipment_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_production_hdr_amount": {
+          "name": "total_production_hdr_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_additional_cost_amount": {
+          "name": "total_additional_cost_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vat_hdr_amount": {
+          "name": "vat_hdr_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_final_production_hdr_amount": {
+          "name": "total_final_production_hdr_amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_date": {
+          "name": "requested_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_person": {
+          "name": "response1_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_date": {
+          "name": "response1_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_status": {
+          "name": "response1_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response1_remarks": {
+          "name": "response1_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_person": {
+          "name": "response2_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_date": {
+          "name": "response2_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_status": {
+          "name": "response2_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response2_remarks": {
+          "name": "response2_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purchase_head_response_person": {
+          "name": "purchase_head_response_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purchase_head_response_date": {
+          "name": "purchase_head_response_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purchase_head_response_status": {
+          "name": "purchase_head_response_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purchase_head_response_remarks": {
+          "name": "purchase_head_response_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imports_response1_person": {
+          "name": "imports_response1_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imports_response1_date": {
+          "name": "imports_response1_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imports_response1_status": {
+          "name": "imports_response1_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imports_response1_remarks": {
+          "name": "imports_response1_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_person": {
+          "name": "final_response_person",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_date": {
+          "name": "final_response_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_status": {
+          "name": "final_response_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_response_remarks": {
+          "name": "final_response_remarks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_shipment_date": {
+          "name": "first_shipment_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lc_apply_target_date": {
+          "name": "lc_apply_target_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "loading_port_id": {
+          "name": "loading_port_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discharge_port_id": {
+          "name": "discharge_port_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shipment_type": {
+          "name": "shipment_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "supplier_company_id": {
+          "name": "supplier_company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stock_store_id": {
+          "name": "stock_store_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erp_pi_ref_no": {
+          "name": "erp_pi_ref_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_for_cnf_fob": {
+          "name": "price_for_cnf_fob",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_purchase_order_hdr_company_id_tbl_companies_company_id_fk": {
+          "name": "tbl_purchase_order_hdr_company_id_tbl_companies_company_id_fk",
+          "tableFrom": "tbl_purchase_order_hdr",
+          "tableTo": "tbl_companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "company_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_purchase_order_hdr_supplier_id_tbl_suppliers_supplier_id_fk": {
+          "name": "tbl_purchase_order_hdr_supplier_id_tbl_suppliers_supplier_id_fk",
+          "tableFrom": "tbl_purchase_order_hdr",
+          "tableTo": "tbl_suppliers",
+          "columnsFrom": [
+            "supplier_id"
+          ],
+          "columnsTo": [
+            "supplier_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tbl_purchase_order_hdr_po_store_id_tbl_stores_store_id_fk": {
+          "name": "tbl_purchase_order_hdr_po_store_id_tbl_stores_store_id_fk",
+          "tableFrom": "tbl_purchase_order_hdr",
+          "tableTo": "tbl_stores",
+          "columnsFrom": [
+            "po_store_id"
+          ],
+          "columnsTo": [
+            "store_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_stores": {
+      "name": "tbl_stores",
+      "schema": "",
+      "columns": {
+        "store_id": {
+          "name": "store_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "store_name": {
+          "name": "store_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location": {
+          "name": "location",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_stores_company_id_tbl_companies_company_id_fk": {
+          "name": "tbl_stores_company_id_tbl_companies_company_id_fk",
+          "tableFrom": "tbl_stores",
+          "tableTo": "tbl_companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "company_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_sub_categories": {
+      "name": "tbl_sub_categories",
+      "schema": "",
+      "columns": {
+        "sub_category_id": {
+          "name": "sub_category_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "main_category_id": {
+          "name": "main_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sub_category_name": {
+          "name": "sub_category_name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_sub_categories_main_category_id_tbl_main_categories_main_category_id_fk": {
+          "name": "tbl_sub_categories_main_category_id_tbl_main_categories_main_category_id_fk",
+          "tableFrom": "tbl_sub_categories",
+          "tableTo": "tbl_main_categories",
+          "columnsFrom": [
+            "main_category_id"
+          ],
+          "columnsTo": [
+            "main_category_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_suppliers": {
+      "name": "tbl_suppliers",
+      "schema": "",
+      "columns": {
+        "supplier_id": {
+          "name": "supplier_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "supplier_name": {
+          "name": "supplier_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_no": {
+          "name": "contact_no",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tax_number": {
+          "name": "tax_number",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_trailers": {
+      "name": "tbl_trailers",
+      "schema": "",
+      "columns": {
+        "trailer_id": {
+          "name": "trailer_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "trailer_number": {
+          "name": "trailer_number",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_trucks": {
+      "name": "tbl_trucks",
+      "schema": "",
+      "columns": {
+        "truck_id": {
+          "name": "truck_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "truck_number": {
+          "name": "truck_number",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_user_status": {
+      "name": "tbl_user_status",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "is_online": {
+          "name": "is_online",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "last_seen": {
+          "name": "last_seen",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tbl_user_status_user_id_tbl_users_id_fk": {
+          "name": "tbl_user_status_user_id_tbl_users_id_fk",
+          "tableFrom": "tbl_user_status",
+          "tableTo": "tbl_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tbl_users": {
+      "name": "tbl_users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password": {
+          "name": "password",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "permissions": {
+          "name": "permissions",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
