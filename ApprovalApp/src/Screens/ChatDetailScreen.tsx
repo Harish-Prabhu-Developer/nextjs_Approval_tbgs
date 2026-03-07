@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Clipboard,
   FlatList,
   Image,
@@ -91,22 +92,34 @@ export default function ChatDetailScreen() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const handleBackPress = useCallback(() => {
+    navigation.navigate('ChatList');
+    return true;
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+      return () => backHandler.remove();
+    }, [handleBackPress])
+  );
+
   const loadConversation = useCallback(async () => {
     if (!currentUser?.id) return;
     try {
       setLoading(true);
       const [users, nextMessages] = await Promise.all([
-        fetchChatUsersApi(Number(currentUser.id), token),
-        fetchMessagesApi(Number(currentUser.id), recipientId, token),
+        fetchChatUsersApi(Number(currentUser?.id), token),
+        fetchMessagesApi(Number(currentUser?.id), recipientId, token),
       ]);
       setRecipient(users.find((entry) => Number(entry.id) === recipientId) || null);
       setMessages(nextMessages);
-      await markMessagesReadApi(recipientId, Number(currentUser.id), token);
+      await markMessagesReadApi(recipientId, Number(currentUser?.id), token);
       const socket = getSocket();
       if (socket?.connected) {
         socket.emit('messages-read', {
           senderId: recipientId,
-          receiverId: Number(currentUser.id),
+          receiverId: Number(currentUser?.id),
         });
       }
     } catch (error) {
@@ -140,7 +153,7 @@ export default function ChatDetailScreen() {
       if (!socket?.connected) return;
       socket.emit('typing', {
         receiverId: recipientId,
-        userId: Number(currentUser.id),
+        userId: Number(currentUser?.id),
         typing,
       });
     },
@@ -154,17 +167,22 @@ export default function ChatDetailScreen() {
 
     const handleConnect = () => {
       setIsConnected(true);
-      socket.emit('join', { userId: Number(currentUser.id) });
+      socket.emit('join', { userId: Number(currentUser?.id) });
       socket.emit('messages-read', {
         senderId: recipientId,
-        receiverId: Number(currentUser.id),
+        receiverId: Number(currentUser?.id),
       });
     };
 
     const handleDisconnect = () => setIsConnected(false);
 
-    const handleNewMessage = (payload: Message) => {
-      const message = normalizeMessage(payload);
+    const handleNewMessage = (payload: any) => {
+      const message = normalizeMessage({
+        ...payload,
+        message: payload.message || '',
+        createdAt: payload.createdAt?.toString() || new Date().toISOString(),
+        isRead: !!payload.isRead
+      });
       const myId = Number(currentUser.id);
       const isForChat =
         (Number(message.senderId) === recipientId && Number(message.receiverId) === myId) ||
@@ -183,11 +201,11 @@ export default function ChatDetailScreen() {
     };
 
     const handleMessagesRead = ({ senderId, receiverId }: { senderId: number; receiverId: number }) => {
-      if (Number(senderId) !== Number(currentUser.id) || Number(receiverId) !== recipientId) return;
+      if (Number(senderId) !== Number(currentUser?.id) || Number(receiverId) !== recipientId) return;
       setMessages((currentMessages) =>
         currentMessages.map((message) =>
-          Number(message.senderId) === Number(currentUser.id) &&
-          Number(message.receiverId) === recipientId
+          Number(message.senderId) === Number(currentUser?.id) &&
+            Number(message.receiverId) === recipientId
             ? { ...message, isRead: true }
             : message
         )
@@ -205,12 +223,12 @@ export default function ChatDetailScreen() {
       setRecipient((currentRecipient) =>
         currentRecipient
           ? {
-              ...currentRecipient,
-              status: {
-                isOnline,
-                lastSeen: currentRecipient.status?.lastSeen || new Date().toISOString(),
-              },
-            }
+            ...currentRecipient,
+            status: {
+              isOnline,
+              lastSeen: currentRecipient.status?.lastSeen || new Date().toISOString(),
+            },
+          }
           : currentRecipient
       );
     };
@@ -244,8 +262,8 @@ export default function ChatDetailScreen() {
   const groupedMessages = useMemo<ChatRow[]>(() => {
     const filteredMessages = searchTerm
       ? messages.filter((message) =>
-          message.message?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+        message.message?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
       : messages;
 
     const rows: ChatRow[] = [];
@@ -299,7 +317,7 @@ export default function ChatDetailScreen() {
     const tempId = Date.now();
     const optimisticMessage: Message = {
       id: tempId,
-      senderId: Number(currentUser.id),
+      senderId: Number(currentUser?.id),
       receiverId: recipientId,
       message: inputValue.trim(),
       fileUrl: pendingFile?.uri,
@@ -334,7 +352,7 @@ export default function ChatDetailScreen() {
 
       const persistedMessage = await createChatMessageApi(
         {
-          senderId: Number(currentUser.id),
+          senderId: Number(currentUser?.id),
           receiverId: recipientId,
           message: optimisticMessage.message,
           fileUrl: uploaded.fileUrl,
@@ -404,10 +422,10 @@ export default function ChatDetailScreen() {
       );
     }
 
-    const isOwn = Number(item.senderId) === Number(currentUser.id);
+    const isOwn = !!currentUser && Number(item.senderId) === Number(currentUser.id);
     const isSelected = selectedMessageIds.includes(Number(item.id));
     const isImage = item.fileType?.startsWith('image/');
-    const replyOwner = item.replyTo?.senderId === Number(currentUser.id) ? 'You' : name;
+    const replyOwner = (item.replyTo && !!currentUser && Number(item.replyTo.senderId) === Number(currentUser.id)) ? 'You' : name;
 
     return (
       <Pressable
@@ -427,14 +445,12 @@ export default function ChatDetailScreen() {
             );
           }
         }}
-        className={`px-4 py-1 ${isOwn ? 'items-end' : 'items-start'} ${
-          isSelected ? 'bg-indigo-50/50' : ''
-        }`}
+        className={`px-4 py-1 ${isOwn ? 'items-end' : 'items-start'} ${isSelected ? 'bg-indigo-50/50' : ''
+          }`}
       >
         <View
-          className={`max-w-[85%] rounded-2xl ${isOwn ? 'bg-indigo-600' : 'bg-white border border-slate-100'} ${
-            isImage ? 'p-1' : 'p-3'
-          }`}
+          className={`max-w-[85%] rounded-2xl ${isOwn ? 'bg-indigo-600' : 'bg-white border border-slate-100'} ${isImage ? 'p-1' : 'p-3'
+            }`}
           style={
             highlightedMessageId === Number(item.id)
               ? { borderWidth: 2, borderColor: '#f59e0b' }
@@ -444,9 +460,8 @@ export default function ChatDetailScreen() {
           {item.replyTo && (
             <Pressable
               onPress={() => scrollToMessage(Number(item.replyTo?.id))}
-              className={`mb-2 rounded-xl p-2 border-l-4 ${
-                isOwn ? 'bg-indigo-700/50 border-white/40' : 'bg-slate-50 border-indigo-500'
-              }`}
+              className={`mb-2 rounded-xl p-2 border-l-4 ${isOwn ? 'bg-indigo-700/50 border-white/40' : 'bg-slate-50 border-indigo-500'
+                }`}
             >
               <Text className={`text-[9px] font-black uppercase tracking-widest ${isOwn ? 'text-indigo-200' : 'text-indigo-600'}`}>
                 {replyOwner}
@@ -540,7 +555,7 @@ export default function ChatDetailScreen() {
                 onPress={() => {
                   const textToCopy = messages
                     .filter((message) => selectedMessageIds.includes(Number(message.id)))
-                    .map((message) => `${Number(message.senderId) === Number(currentUser.id) ? 'Me' : name}: ${message.message}`)
+                    .map((message) => `${Number(message.senderId) === Number(currentUser?.id) ? 'Me' : name}: ${message.message}`)
                     .join('\\n');
                   Clipboard.setString(textToCopy);
                   Alert.alert('Copied', 'Messages copied to clipboard');
@@ -558,7 +573,7 @@ export default function ChatDetailScreen() {
         ) : (
           <>
             <View className="flex-row items-center flex-1">
-              <Pressable onPress={() => navigation.goBack()} className="p-2">
+              <Pressable onPress={() => navigation.navigate('ChatList')} className="p-2">
                 <ChevronLeft size={28} color="#1e293b" />
               </Pressable>
               <View className="w-10 h-10 rounded-2xl bg-indigo-500 items-center justify-center mr-3">
@@ -665,7 +680,7 @@ export default function ChatDetailScreen() {
             <View className="bg-slate-50 mx-3 mt-2 mb-1 p-3 rounded-2xl border-l-4 border-indigo-500 flex-row justify-between">
               <View className="flex-1">
                 <Text className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">
-                  Replying to {Number(replyingTo.senderId) === Number(currentUser.id) ? 'Yourself' : name}
+                  Replying to {Number(replyingTo.senderId) === Number(currentUser?.id) ? 'Yourself' : name}
                 </Text>
                 <Text className="text-xs text-slate-500 font-medium" numberOfLines={1}>
                   {replyingTo.message || (replyingTo.fileType?.startsWith('image/') ? '📷 Photo' : '📄 File')}
@@ -718,9 +733,8 @@ export default function ChatDetailScreen() {
             <TouchableOpacity
               onPress={() => void handleSend()}
               disabled={(!inputValue.trim() && !pendingFile) || isUploading || isSending}
-              className={`w-12 h-12 rounded-2xl items-center justify-center ml-2 ${
-                (inputValue.trim() || pendingFile) && !isUploading && !isSending ? 'bg-indigo-600' : 'bg-slate-100'
-              }`}
+              className={`w-12 h-12 rounded-2xl items-center justify-center ml-2 ${(inputValue.trim() || pendingFile) && !isUploading && !isSending ? 'bg-indigo-600' : 'bg-slate-100'
+                }`}
             >
               {isUploading || isSending ? (
                 <ActivityIndicator size="small" color="#4f46e5" />

@@ -35,12 +35,13 @@ export const useSocket = (userId: number | undefined) => {
                 socketInstance = io({
                     path: "/api/socket",
                     addTrailingSlash: false,
-                    transports: ["websocket", "polling"],
+                    transports: ["websocket"], // Prioritize websocket to avoid polling flaps
                     reconnection: true,
-                    reconnectionDelay: 1000,
+                    reconnectionDelay: 2000,    // Slightly more conservative
+                    reconnectionDelayMax: 5000,
                     reconnectionAttempts: Infinity,
-                    timeout: 45000,
-                    autoConnect: true, // Force auto-connect for immediate start
+                    timeout: 60000,
+                    autoConnect: true,
                 });
                 socketCache[cacheKey] = socketInstance;
             }

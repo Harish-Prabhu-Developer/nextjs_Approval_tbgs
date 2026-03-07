@@ -101,8 +101,9 @@ export default function ChatListScreen() {
     const handleNewMessage = (data: any) => {
       const senderId = Number(data.senderId);
       const receiverId = Number(data.receiverId);
-      const otherUserId = senderId === Number(currentUser.id) ? receiverId : senderId;
-      const isIncoming = receiverId === Number(currentUser.id);
+      const myId = Number(currentUser?.id);
+      const otherUserId = senderId === myId ? receiverId : senderId;
+      const isIncoming = receiverId === myId;
 
       setUsers((previousUsers) =>
         updateUser(previousUsers, otherUserId, (user) => ({
@@ -113,7 +114,7 @@ export default function ChatListScreen() {
           lastFileUrl: normalizeFileUrl(data.fileUrl),
           lastFileType: data.fileType || null,
           unreadCount:
-            isIncoming && selectedUserId !== otherUserId
+            isIncoming && Number(selectedUserId) !== otherUserId
               ? Number(user.unreadCount || 0) + 1
               : 0,
         }))
@@ -127,7 +128,8 @@ export default function ChatListScreen() {
       senderId: number;
       receiverId: number;
     }) => {
-      if (Number(receiverId) !== Number(currentUser.id)) return;
+      const myId = Number(currentUser?.id);
+      if (Number(receiverId) !== myId) return;
 
       setUsers((previousUsers) =>
         updateUser(previousUsers, Number(senderId), (user) => ({
@@ -167,6 +169,13 @@ export default function ChatListScreen() {
       socket.off('status-update', handleStatusUpdate);
     };
   }, [currentUser?.id, selectedUserId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedUserId(null); // Clear active user tracking when on list screen
+      void loadUsers();
+    }, [loadUsers])
+  );
 
   const chattedUsers = useMemo(() => {
     return users
@@ -231,15 +240,13 @@ export default function ChatListScreen() {
   }) => (
     <Pressable
       onPress={() => openChat(item, isNewChat)}
-      className={`flex-row items-center px-4 py-4 active:bg-slate-50 border-b border-slate-50 ${
-        isNewChat ? 'mx-2 my-1 rounded-2xl' : ''
-      }`}
+      className={`flex-row items-center px-4 py-4 active:bg-slate-50 border-b border-slate-50 ${isNewChat ? 'mx-2 my-1 rounded-2xl' : ''
+        }`}
     >
       <View className="relative">
         <View
-          className={`w-14 h-14 rounded-2xl items-center justify-center shadow-sm ${
-            isNewChat ? 'bg-indigo-400' : selectedUserId === item.id ? 'bg-indigo-600' : 'bg-indigo-500'
-          }`}
+          className={`w-14 h-14 rounded-2xl items-center justify-center shadow-sm ${isNewChat ? 'bg-indigo-400' : selectedUserId === item.id ? 'bg-indigo-600' : 'bg-indigo-500'
+            }`}
         >
           <Text className="text-xl font-black text-white">
             {item.name.charAt(0).toUpperCase()}
@@ -256,26 +263,25 @@ export default function ChatListScreen() {
             {item.name}
           </Text>
           {item.lastMessageTime && !isNewChat && (
-            <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <Text className={`text-[10px] uppercase tracking-widest ${item.unreadCount && item.unreadCount > 0 ? 'font-black text-emerald-500' : 'font-bold text-slate-400'}`}>
               {formatMessageTime(item.lastMessageTime)}
             </Text>
           )}
         </View>
         <View className="flex-row justify-between items-center">
           <Text
-            className={`text-sm truncate flex-1 mr-2 ${
-              item.isTyping
-                ? 'font-black text-emerald-500'
-                : item.unreadCount
-                  ? 'font-bold text-slate-700'
-                  : 'font-medium text-slate-500'
-            }`}
+            className={`text-sm truncate flex-1 mr-2 ${item.isTyping
+              ? 'font-black text-emerald-500'
+              : item.unreadCount
+                ? 'font-bold text-slate-700'
+                : 'font-medium text-slate-500'
+              }`}
             numberOfLines={1}
           >
             {isNewChat ? `@${item.username}` : getLastMessagePreview(item)}
           </Text>
           {!isNewChat && item.unreadCount !== undefined && item.unreadCount > 0 && (
-            <View className="bg-indigo-600 h-5 min-w-[20px] rounded-full items-center justify-center px-1.5 shadow-sm">
+            <View className="bg-emerald-500 h-5 min-w-[20px] rounded-full items-center justify-center px-1.5 shadow-md shadow-emerald-100">
               <Text className="text-[10px] font-black text-white">
                 {item.unreadCount > 9 ? '9+' : item.unreadCount}
               </Text>
@@ -290,7 +296,7 @@ export default function ChatListScreen() {
           )}
         </View>
       </View>
-    </Pressable>
+    </Pressable >
   );
 
   if (loading && users.length === 0) {

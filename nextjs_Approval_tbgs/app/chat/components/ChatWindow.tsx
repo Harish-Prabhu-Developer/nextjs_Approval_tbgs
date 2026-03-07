@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic';
 import { Send, Paperclip, Smile, MoreHorizontal, Phone, Video, Search, MessageSquare, Check, CheckCheck, ChevronLeft, Download, File, FileText, Image as ImageIcon, X, Trash2, DownloadCloud, CornerUpLeft, Copy, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatMessageTime } from '../utils/time';
+import { formatMessageTime, parseDate } from '../utils/time';
 import axios from 'axios';
 import ExpandableText from '@/app/components/ExpandableText';
 import { toast } from 'react-hot-toast';
@@ -53,12 +53,13 @@ interface ChatWindowProps {
     onSendMessage: (text: string, fileData?: any) => void;
     onTyping?: (isTyping: boolean) => void;
     isRecipientTyping?: boolean;
+    isConnected: boolean;
     onBack?: () => void;
     onClearChat: () => void;
     onDeleteMessage: (id: number) => void;
 }
 
-export default function ChatWindow({ recipient, currentUser, messages, onSendMessage, onTyping, isRecipientTyping, onBack, onClearChat, onDeleteMessage }: ChatWindowProps) {
+export default function ChatWindow({ recipient, currentUser, messages, onSendMessage, onTyping, isRecipientTyping, isConnected, onBack, onClearChat, onDeleteMessage }: ChatWindowProps) {
     const [inputValue, setInputValue] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -69,6 +70,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
     const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
     const [messageMenuData, setMessageMenuData] = useState<{ message: Message, x: number, y: number } | null>(null);
     const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
+    const [showStatusAlt, setShowStatusAlt] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -196,6 +198,23 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
     }, [recipient?.id]);
 
     useEffect(() => {
+        let interval: any;
+        if (recipient?.status?.isOnline) {
+            interval = setInterval(() => {
+                setShowStatusAlt(prev => !prev);
+            }, 3000);
+        } else {
+            setShowStatusAlt(false);
+        }
+        return () => clearInterval(interval);
+    }, [recipient?.status?.isOnline, recipient?.id]);
+
+    const statusText = useMemo(() => {
+        if (!recipient?.status?.isOnline) return `Last seen ${formatMessageTime(recipient?.status?.lastSeen)}`;
+        return showStatusAlt ? `Last seen ${formatMessageTime(recipient?.status?.lastSeen)}` : 'Available now';
+    }, [recipient?.status?.isOnline, recipient?.status?.lastSeen, showStatusAlt]);
+
+    useEffect(() => {
         scrollToBottom();
     }, [messages, isRecipientTyping]);
 
@@ -265,7 +284,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
         const chatHeader = `Chat history with ${recipient.name}\nExported on: ${new Date().toLocaleString()}\n-------------------------------------------\n\n`;
         const chatBody = messages.map(m => {
             const time = new Date(m.createdAt).toLocaleString();
-            const sender = m.senderId === currentUser.id ? 'Me' : recipient.name;
+            const sender = Number(m.senderId) === Number(currentUser.id) ? 'Me' : recipient.name;
             return `[${time}] ${sender}: ${m.message || (m.fileUrl ? '[Attachment]' : '')}`;
         }).join('\n');
 
@@ -332,7 +351,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
         const textToCopy = selectedMsgs
             .map(m => {
                 const time = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const sender = m.senderId === currentUser.id ? 'Me' : recipient?.name;
+                const sender = Number(m.senderId) === Number(currentUser.id) ? 'Me' : recipient?.name;
                 return `[${time}] ${sender}: ${m.message}`;
             })
             .join('\n');
@@ -453,9 +472,20 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                         ) : (
                                             <>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${recipient.status?.isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-                                                <p className="text-[10px] md:text-xs font-semibold text-slate-400">
-                                                    {recipient.status?.isOnline ? 'Available now' : `Last seen ${formatMessageTime(recipient.status?.lastSeen)}`}
-                                                </p>
+                                                <div className="h-4 flex items-center overflow-hidden">
+                                                    <AnimatePresence mode="wait">
+                                                        <motion.p
+                                                            key={statusText}
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: -10 }}
+                                                            transition={{ duration: 0.3 }}
+                                                            className="text-[10px] md:text-xs font-semibold text-slate-400"
+                                                        >
+                                                            {statusText}
+                                                        </motion.p>
+                                                    </AnimatePresence>
+                                                </div>
                                             </>
                                         )}
                                     </div>
@@ -582,10 +612,10 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                 );
                             }
 
-                            const isOwn = item.senderId === currentUser.id;
+                            const isOwn = Number(item.senderId) === Number(currentUser.id);
                             const showTail = item.isFirstInGroup;
                             const isImage = item.fileType?.startsWith('image/');
-                            const replyOwner = item.replyTo?.senderId === currentUser.id ? 'You' : recipient?.name;
+                            const replyOwner = Number(item.replyTo?.senderId) === Number(currentUser.id) ? 'You' : recipient?.name;
 
                             return (
                                 <motion.div
@@ -722,7 +752,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
 
                                         <div className={`mt-1 flex items-center justify-end space-x-1.5 ${isImage ? 'px-2 pb-1' : ''} ${isOwn ? 'text-indigo-100/70' : 'text-slate-400'}`}>
                                             <span className="text-[9px] font-bold">
-                                                {item.isSending ? 'Syncing...' : new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {item.isSending ? 'Syncing...' : (item.createdAt ? (parseDate(item.createdAt)?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || '') : '')}
                                             </span>
                                             {isOwn && !item.isSending && (
                                                 <div className="flex items-center">
@@ -798,7 +828,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                 <div className="flex items-center justify-between px-4 py-3 border-l-4 border-indigo-500 rounded-l-md">
                                     <div className="flex-1 min-w-0 pr-4">
                                         <p className="text-xs font-black text-indigo-600 mb-0.5 uppercase tracking-wide">
-                                            Replying to {replyingTo.senderId === currentUser.id ? 'Yourself' : recipient?.name}
+                                            Replying to {Number(replyingTo.senderId) === Number(currentUser.id) ? 'Yourself' : recipient?.name}
                                         </p>
                                         <p className="text-sm text-slate-600 truncate font-medium">
                                             {replyingTo.message || (replyingTo.fileType?.startsWith('image/') ? '📷 Photo' : '📄 File')}
@@ -927,7 +957,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                 <Share2 size={16} className="text-slate-400" />
                                 <span className="text-sm font-bold text-slate-700">Share</span>
                             </button>
-                            {(messageMenuData.message.senderId === currentUser.id) && (
+                            {(Number(messageMenuData.message.senderId) === Number(currentUser.id)) && (
                                 <button
                                     onClick={() => handleDeleteMessage(messageMenuData.message.id)}
                                     className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-red-50 transition-colors text-left group border-t border-slate-50"

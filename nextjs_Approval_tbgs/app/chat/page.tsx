@@ -21,12 +21,23 @@ export default function ChatPage() {
     const socketRef = useRef<any>(null);
     const readInProgressRef = useRef<Set<number>>(new Set());
     const lastFetchTimeRef = useRef<number>(0);
-
     useEffect(() => {
         selectedUserRef.current = selectedUserId;
     }, [selectedUserId]);
 
     const { socket, isConnected } = useSocket(currentUser?.id);
+
+    const [showConnected, setShowConnected] = useState(false);
+
+    useEffect(() => {
+        if (isConnected) {
+            setShowConnected(true);
+            const timer = setTimeout(() => setShowConnected(false), 3000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowConnected(false);
+        }
+    }, [isConnected]);
 
     useEffect(() => {
         socketRef.current = socket;
@@ -279,10 +290,39 @@ export default function ChatPage() {
                 <ChatSidebar users={users} currentUser={currentUser} selectedUserId={selectedUserId} onSelectUser={setSelectedUserId} isLoading={isLoading} />
             </div>
             <div className={`${selectedUserId ? 'flex' : 'hidden md:flex'} flex-1 relative flex flex-col h-full overflow-hidden bg-white`}>
-                <ChatWindow recipient={users.find(u => u.id === selectedUserId) || null} currentUser={currentUser} messages={messages} onSendMessage={handleSendMessage} onTyping={handleTyping} onClearChat={() => { setMessages([]); fetchUsers(); }} onDeleteMessage={(id) => { setMessages(prev => prev.filter(m => Number(m.id) !== Number(id))); if (socketRef.current) { socketRef.current.emit('delete-message', { messageId: id, receiverId: selectedUserId }); } }} isRecipientTyping={isTyping} onBack={() => setSelectedUserId(null)} />
+                <ChatWindow
+                    recipient={users.find(u => u.id === selectedUserId) || null}
+                    currentUser={currentUser}
+                    messages={messages}
+                    onSendMessage={handleSendMessage}
+                    onTyping={handleTyping}
+                    onClearChat={() => { setMessages([]); fetchUsers(); }}
+                    onDeleteMessage={(id) => { setMessages(prev => prev.filter(m => Number(m.id) !== Number(id))); if (socketRef.current) { socketRef.current.emit('delete-message', { messageId: id, receiverId: selectedUserId }); } }}
+                    isRecipientTyping={isTyping}
+                    isConnected={isConnected}
+                    onBack={() => setSelectedUserId(null)}
+                />
                 <AnimatePresence>
+                    {showConnected && isConnected && (
+                        <motion.div
+                            key="connected"
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl z-50 flex items-center space-x-2 border border-emerald-400/30"
+                        >
+                            <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+                            <span>Connected</span>
+                        </motion.div>
+                    )}
                     {!isConnected && (
-                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-red-500 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl z-50 flex items-center space-x-2">
+                        <motion.div
+                            key="syncing"
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-red-500 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl z-50 flex items-center space-x-2 border border-red-400/30"
+                        >
                             <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
                             <span>Syncing...</span>
                         </motion.div>
