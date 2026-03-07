@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   BackHandler,
   Clipboard,
   FlatList,
@@ -63,6 +64,59 @@ const replaceTempMessage = (messages: Message[], tempId: number, nextMessage: Me
     messages.filter((message) => Number(message.id) !== Number(tempId)),
     nextMessage
   );
+
+const TypingIndicator = () => {
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animateDot = (dot: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0.3,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.delay(400),
+        ])
+      );
+    };
+
+    const animation = Animated.parallel([
+      animateDot(dot1, 0),
+      animateDot(dot2, 200),
+      animateDot(dot3, 400),
+    ]);
+
+    animation.start();
+    return () => animation.stop();
+  }, [dot1, dot2, dot3]);
+
+  return (
+    <View className="flex-row items-center justify-center gap-1 ml-5 w-16 h-10 px-4 bg-white elevation-lg rounded-xl shadow-sm">
+      <Animated.View
+        style={{ opacity: dot1, transform: [{ scale: dot1 }] }}
+        className="w-2 h-2 bg-indigo-500 rounded-full"
+      />
+      <Animated.View
+        style={{ opacity: dot2, transform: [{ scale: dot2 }] }}
+        className="w-2 h-2 bg-indigo-500 rounded-full"
+      />
+      <Animated.View
+        style={{ opacity: dot3, transform: [{ scale: dot3 }] }}
+        className="w-2 h-2 bg-indigo-500 rounded-full"
+      />
+    </View>
+  );
+};
 
 export default function ChatDetailScreen() {
   const route = useRoute<any>();
@@ -626,13 +680,7 @@ export default function ChatDetailScreen() {
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{ paddingVertical: 20, paddingBottom: 8, flexGrow: loading ? 1 : 0 }}
         ListEmptyComponent={loading ? <ActivityIndicator size="large" color="#6366f1" /> : null}
-        ListFooterComponent={
-          isRecipientTyping ? (
-            <View className="px-4 py-2">
-              <Text className="text-xs font-black uppercase tracking-widest text-indigo-500">typing...</Text>
-            </View>
-          ) : null
-        }
+        ListFooterComponent={isRecipientTyping ? <TypingIndicator /> : null}
         onContentSizeChange={() => !searchTerm && listRef.current?.scrollToEnd({ animated: true })}
         onScrollToIndexFailed={({ index, averageItemLength }) => {
           listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true });
