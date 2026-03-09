@@ -118,6 +118,71 @@ const TypingIndicator = () => {
   );
 };
 
+const MobileExpandableText = ({
+  text,
+  limit = 200,
+  isOwn,
+  highlight = ""
+}: {
+  text: string;
+  limit?: number;
+  isOwn: boolean;
+  highlight?: string;
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const safeText = (text || "").toString().trim();
+
+  if (!safeText) return null;
+
+  const isLongText = safeText.length > limit;
+
+  const renderFormattedText = (content: string) => {
+    const escapedHighlight = highlight.trim() ? highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    // Match **bold**, *bold*, \n, and highlight
+    const regex = new RegExp(`(\\*\\*.*?\\*\\*|\\*.*?\\*|\\n${escapedHighlight ? `|${escapedHighlight}` : ""})`, "gi");
+    const parts = content.split(regex);
+
+    return parts.map((part, index) => {
+      if (!part) return null;
+      if (part === '\n') return <Text key={index}>{'\n'}</Text>;
+
+      // WhatsApp style *bold* or markdown **bold**
+      if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('*') && part.endsWith('*'))) {
+        const isDouble = part.startsWith('**');
+        const content = isDouble ? part.slice(2, -2) : part.slice(1, -1);
+        return (
+          <Text key={index} style={{ fontWeight: 'bold' }}>{content}</Text>
+        );
+      }
+
+      if (escapedHighlight && part.toLowerCase() === highlight.toLowerCase()) {
+        return (
+          <Text key={index} style={{ backgroundColor: '#fef08a', color: '#0f172a' }}>{part}</Text>
+        );
+      }
+
+      return <Text key={index}>{part}</Text>;
+    });
+  };
+
+  const displayText = isExpanded ? safeText : isLongText ? safeText.slice(0, limit) : safeText;
+
+  return (
+    <Text className={`text-sm leading-relaxed ${isOwn ? 'text-white' : 'text-slate-800'}`}>
+      {renderFormattedText(displayText)}
+      {isLongText && (
+        <Text
+          onPress={() => setIsExpanded(!isExpanded)}
+          className={`font-black ml-1 ${isOwn ? 'text-indigo-200' : 'text-indigo-600'}`}
+          style={{ textDecorationLine: 'underline' }}
+        >
+          {isExpanded ? " Read less" : "... Read more"}
+        </Text>
+      )}
+    </Text>
+  );
+};
+
 export default function ChatDetailScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -255,14 +320,21 @@ export default function ChatDetailScreen() {
     };
 
     const handleMessagesRead = ({ senderId, receiverId }: { senderId: number; receiverId: number }) => {
-      if (Number(senderId) !== Number(currentUser?.id) || Number(receiverId) !== recipientId) return;
+      const myId = Number(currentUser?.id);
+      const isRelevant =
+        (Number(senderId) === myId && Number(receiverId) === recipientId) || // I am sender, they read
+        (Number(receiverId) === myId && Number(senderId) === recipientId);    // They are sender, I read
+
+      if (!isRelevant) return;
+
       setMessages((currentMessages) =>
-        currentMessages.map((message) =>
-          Number(message.senderId) === Number(currentUser?.id) &&
-            Number(message.receiverId) === recipientId
-            ? { ...message, isRead: true }
-            : message
-        )
+        currentMessages.map((message) => {
+          const isFromSenderToReceiver =
+            Number(message.senderId) === Number(senderId) &&
+            Number(message.receiverId) === Number(receiverId);
+
+          return isFromSenderToReceiver ? { ...message, isRead: true } : message;
+        })
       );
     };
 
@@ -555,9 +627,11 @@ export default function ChatDetailScreen() {
           )}
 
           {!!item.message && (
-            <Text className={`text-sm leading-relaxed ${isOwn ? 'text-white' : 'text-slate-800'}`}>
-              {item.message}
-            </Text>
+            <MobileExpandableText
+              text={item.message}
+              isOwn={isOwn}
+              highlight={searchTerm}
+            />
           )}
 
           <View className="flex-row items-center justify-end mt-1">

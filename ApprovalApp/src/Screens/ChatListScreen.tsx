@@ -129,14 +129,16 @@ export default function ChatListScreen() {
       receiverId: number;
     }) => {
       const myId = Number(currentUser?.id);
-      if (Number(receiverId) !== myId) return;
-
-      setUsers((previousUsers) =>
-        updateUser(previousUsers, Number(senderId), (user) => ({
-          ...user,
-          unreadCount: 0,
-        }))
-      );
+      // If I am the receiver (someone read messages I was supposed to see)
+      // This clears the unread dot even if I'm on a different device
+      if (Number(receiverId) === myId) {
+        setUsers((previousUsers) =>
+          updateUser(previousUsers, Number(senderId), (user) => ({
+            ...user,
+            unreadCount: 0,
+          }))
+        );
+      }
     };
 
     const handleStatusUpdate = ({

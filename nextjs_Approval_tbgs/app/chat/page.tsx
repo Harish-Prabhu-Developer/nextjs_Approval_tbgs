@@ -27,16 +27,27 @@ export default function ChatPage() {
 
     const { socket, isConnected } = useSocket(currentUser?.id);
 
+    // Debounced stable connection state to prevent rapid flicker
+    const [stableConnected, setStableConnected] = useState(false);
     const [showConnected, setShowConnected] = useState(false);
+    const connDebounceRef = useRef<any>(null);
 
     useEffect(() => {
+        if (connDebounceRef.current) clearTimeout(connDebounceRef.current);
         if (isConnected) {
-            setShowConnected(true);
-            const timer = setTimeout(() => setShowConnected(false), 3000);
-            return () => clearTimeout(timer);
+            // Show 'Connected' banner immediately when we connect
+            connDebounceRef.current = setTimeout(() => {
+                setStableConnected(true);
+                setShowConnected(true);
+                setTimeout(() => setShowConnected(false), 3000);
+            }, 300);
         } else {
-            setShowConnected(false);
+            // Only show 'Syncing...' after 1.5s of sustained disconnection
+            connDebounceRef.current = setTimeout(() => {
+                setStableConnected(false);
+            }, 1500);
         }
+        return () => { if (connDebounceRef.current) clearTimeout(connDebounceRef.current); };
     }, [isConnected]);
 
     useEffect(() => {
@@ -226,11 +237,13 @@ export default function ChatPage() {
         socket.on('message-deleted', handleMessageDeleted);
 
         return () => {
-            socket.off('new-message');
-            socket.off('on-messages-read');
-            socket.off('status-update');
-            socket.off('user-typing');
-            socket.off('message-deleted');
+            socket.off('new-message', handleNewMessage);
+            socket.off('on-messages-read', handleMessagesRead);
+            socket.off('status-update', handleStatusUpdate);
+            socket.off('user-typing', handleTypingEvent);
+            socket.off('message-deleted', handleMessageDeleted);
+            // Clear typing when socket refreshes to avoid stale state
+            setIsTyping(false);
         };
     }, [socket, currentUser?.id, markAsRead]);
 
@@ -303,7 +316,7 @@ export default function ChatPage() {
                     onBack={() => setSelectedUserId(null)}
                 />
                 <AnimatePresence>
-                    {showConnected && isConnected && (
+                    {showConnected && stableConnected && (
                         <motion.div
                             key="connected"
                             initial={{ opacity: 0, y: -20 }}
@@ -315,13 +328,13 @@ export default function ChatPage() {
                             <span>Connected</span>
                         </motion.div>
                     )}
-                    {!isConnected && (
+                    {!stableConnected && (
                         <motion.div
                             key="syncing"
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
-                            className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-red-500 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl z-50 flex items-center space-x-2 border border-red-400/30"
+                            className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl z-50 flex items-center space-x-2 border border-amber-400/30"
                         >
                             <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
                             <span>Syncing...</span>
