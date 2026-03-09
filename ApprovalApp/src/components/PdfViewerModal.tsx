@@ -19,7 +19,12 @@ import {
     Moon,
     Sun,
     FileText,
+    Camera,
+    Share2,
+    Maximize,
 } from 'lucide-react-native';
+import * as Sharing from 'expo-sharing';
+import { captureRef, captureScreen } from 'react-native-view-shot';
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
@@ -57,6 +62,7 @@ const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, pdfDat
     const [currentPage, setCurrentPage] = useState(1);
     const [isLoadingContent, setIsLoadingContent] = useState(true);
     const webviewRef = useRef<WebView>(null);
+    const contentRef = useRef<View>(null);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
     const isHtmlMode = !!htmlContent;
@@ -125,11 +131,25 @@ const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, pdfDat
     .page { background: white; box-shadow: 0 1px 10px rgba(0,0,0,0.15); }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
   <div id="status">Loading PDF...</div>
-  <div id="container"><div id="viewer"></div></div>
+  <div id="container"><div id="viewer" style="background: ${isNightMode ? '#0b1220' : '#f5f5f5'};"></div></div>
   <script>
+    window.captureFullPage = function() {
+      const viewer = document.getElementById("viewer");
+      html2canvas(viewer, { 
+        scale: 1.5,
+        useCORS: true,
+        backgroundColor: "${isNightMode ? '#0b1220' : '#f5f5f5'}"
+      }).then(canvas => {
+        window.ReactNativeWebView.postMessage("FULL_CAPTURE:" + canvas.toDataURL("image/jpeg", 0.7).split(',')[1]);
+      }).catch(err => {
+        window.ReactNativeWebView.postMessage("PDFJS_ERROR:Capture failed");
+      });
+    };
+
     (function() {
       try {
         const b64 = \`${safeBase64}\`;
@@ -372,11 +392,97 @@ const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, pdfDat
             setDlProgress(1);
             setDlStatus('done');
             await saveToPublicStore(base64, true);
+        } else if (typeof data === 'string' && data.startsWith('SHARE_PDF_BASE64:')) {
+            const base64 = data.replace('SHARE_PDF_BASE64:', '');
+            const uri = getFileUri();
+            await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+            setIsGeneratingPdf(false);
+            await Sharing.shareAsync(uri, {
+                mimeType: 'application/pdf',
+                dialogTitle: 'Share Document',
+            });
+        } else if (typeof data === 'string' && data.startsWith('FULL_CAPTURE:')) {
+            const base64 = data.replace('FULL_CAPTURE:', '');
+            const filename = `full_screenshot_${Date.now()}.jpg`;
+            const uri = `${FileSystem.cacheDirectory}${filename}`;
+            await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+            setIsGeneratingPdf(false);
+            await Sharing.shareAsync(uri, {
+                mimeType: 'image/jpeg',
+                dialogTitle: 'Full Page Screenshot',
+            });
         } else if (typeof data === 'string' && data.startsWith('PDF_ERROR:')) {
             const errMsg = data.replace('PDF_ERROR:', '');
             setDlStatus('error');
             setIsGeneratingPdf(false);
             Alert.alert('Download Error', `Failed to generate PDF: ${errMsg}`);
+        }
+    };
+
+
+
+    const handleShareDocument = async () => {
+        try {
+            // First, ensure we have a file to share
+            let fileUri = '';
+
+            if (isHtmlMode) {
+                // For HTML, we need to generate the PDF first or use the one we just generated
+                // Simplified: We'll trigger the same logic as download but for sharing
+                setIsGeneratingPdf(true);
+                webviewRef.current?.injectJavaScript(`
+                    window.html2pdf().set({
+                        margin: [0.5, 0.5],
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true },
+                        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                    }).from(document.body).outputPdf('datauristring').then(pdfBase64 => {
+                        window.ReactNativeWebView.postMessage('SHARE_PDF_BASE64:' + pdfBase64.split(',')[1]);
+                    });
+                    true;
+                `);
+                return;
+            } else {
+                // For PDF mode
+                const uri = getFileUri();
+                const cleanBase64 = normalizedBase64Pdf || pdfData;
+                await FileSystem.writeAsStringAsync(uri, cleanBase64, { encoding: FileSystem.EncodingType.Base64 });
+                fileUri = uri;
+            }
+
+            if (fileUri) {
+                await Sharing.shareAsync(fileUri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: 'Share Document',
+                });
+            }
+        } catch (error) {
+            console.error('Share document failed:', error);
+            Alert.alert('Share Failed', 'An error occurred while preparing the document.');
+        } finally {
+            if (!isHtmlMode) setIsGeneratingPdf(false);
+        }
+    };
+
+    const handleFullScreenshot = async () => {
+        try {
+            setIsGeneratingPdf(true); // Re-use loading state
+            webviewRef.current?.injectJavaScript(`
+                if (window.captureFullPage) {
+                    window.captureFullPage();
+                } else if (typeof html2canvas !== 'undefined') {
+                    html2canvas(document.body, { scale: 1.5, useCORS: true }).then(canvas => {
+                        window.ReactNativeWebView.postMessage("FULL_CAPTURE:" + canvas.toDataURL("image/jpeg", 0.7).split(',')[1]);
+                    });
+                } else {
+                    window.ReactNativeWebView.postMessage("PDF_ERROR:Library not ready");
+                }
+                true;
+            `);
+        } catch (error) {
+            console.error('Full capture failed:', error);
+            setIsGeneratingPdf(false);
+            Alert.alert('Capture Failed', 'Could not generate full-page screenshot.');
         }
     };
 
@@ -416,12 +522,22 @@ const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, pdfDat
                                 color: isNightMode ? '#f1f5f9' : '#0f172a',
                             }}>{title}</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={{
-                            padding: 8, borderRadius: 20,
-                            backgroundColor: isNightMode ? '#1e293b' : '#f1f5f9',
-                        }}>
-                            <X size={20} color={isNightMode ? '#94a3b8' : '#64748b'} />
-                        </TouchableOpacity>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+
+                            <TouchableOpacity onPress={handleFullScreenshot} style={{
+                                padding: 8, borderRadius: 20,
+                                backgroundColor: isNightMode ? '#1e293b' : '#f1f5f9',
+                            }}>
+                                <Camera size={20} color={isNightMode ? '#94a3b8' : '#64748b'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={onClose} style={{
+                                padding: 8, borderRadius: 20,
+                                backgroundColor: isNightMode ? '#1e293b' : '#f1f5f9',
+                            }}>
+                                <X size={20} color={isNightMode ? '#94a3b8' : '#64748b'} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Toolbar */}
@@ -448,6 +564,16 @@ const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, pdfDat
                         {isHtmlMode && <View />}
 
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <TouchableOpacity
+                                onPress={handleShareDocument}
+                                disabled={isGeneratingPdf}
+                                style={{
+                                    padding: 8, borderRadius: 8,
+                                    backgroundColor: isNightMode ? '#1e293b' : '#e2e8f0',
+                                    marginRight: 4
+                                }}>
+                                <Share2 size={20} color={isNightMode ? '#818cf8' : '#64748b'} />
+                            </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => setIsNightMode(!isNightMode)}
                                 style={{
@@ -510,7 +636,11 @@ const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, pdfDat
                     </View>
 
                     {/* Content Area */}
-                    <View style={{ flex: 1, width: screenWidth, backgroundColor: viewerBgColor }}>
+                    <View
+                        ref={contentRef}
+                        collapsable={false}
+                        style={{ flex: 1, width: screenWidth, backgroundColor: viewerBgColor }}
+                    >
                         {isHtmlMode ? (
                             <WebView
                                 ref={webviewRef}
@@ -524,10 +654,22 @@ const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, pdfDat
                                             <meta name="viewport" content="width=device-width, initial-scale=1" />
                                             <style>body { margin: 0; padding: 0; }</style>
                                             <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+                                            <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
                                         </head>
                                         <body>
                                             ${htmlContent}
                                             <script>
+                                                window.captureFullPage = function() {
+                                                    html2canvas(document.body, { 
+                                                        scale: 1.5, 
+                                                        useCORS: true,
+                                                        backgroundColor: "${isNightMode ? '#0b1220' : '#ffffff'}"
+                                                    }).then(canvas => {
+                                                        window.ReactNativeWebView.postMessage("FULL_CAPTURE:" + canvas.toDataURL("image/jpeg", 0.7).split(',')[1]);
+                                                    }).catch(err => {
+                                                        window.ReactNativeWebView.postMessage("PDF_ERROR:" + err.message);
+                                                    });
+                                                };
                                                 // Signal when script is loaded and ready
                                                 window.onload = function() {
                                                     window.ReactNativeWebView.postMessage('GEN_READY');

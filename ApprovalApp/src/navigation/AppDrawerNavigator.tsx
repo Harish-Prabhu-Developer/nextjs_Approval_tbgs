@@ -5,8 +5,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
-import { Bell, BriefcaseBusiness, LayoutDashboard, LogOut, Menu, MessageSquare, ShoppingCart, X } from 'lucide-react-native';
+import { Bell, BriefcaseBusiness, Camera, LayoutDashboard, LogOut, Menu, MessageSquare, ShoppingCart, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { captureScreen } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import Breadcrumbs from '../components/Breadcrumbs';
 
 import { DASHBOARD_CARDS } from '../data/mockData';
@@ -242,6 +244,30 @@ export default function AppDrawerNavigator() {
     [allowedPermissions],
   );
 
+  const handleScreenshot = async () => {
+    try {
+      // Small delay to let the UI settle if needed
+      const uri = await captureScreen({
+        format: 'jpg',
+        quality: 0.8,
+      });
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/jpeg',
+          dialogTitle: 'Share Screenshot',
+          UTI: 'public.jpeg',
+        });
+      } else {
+        Alert.alert('Sharing Unavailable', 'Sharing is not supported on this device.');
+      }
+    } catch (error) {
+      console.error('Screenshot capture failed:', error);
+      Alert.alert('Capture Failed', 'An error occurred while taking the screenshot.');
+    }
+  };
+
   return (
     <Drawer.Navigator
       drawerContent={(props) => (
@@ -288,9 +314,15 @@ export default function AppDrawerNavigator() {
                 </View>
 
                 <View className="flex-row items-center gap-3">
-                  <Pressable className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
-                    <Bell size={18} color="#475569" />
+                  <Pressable
+                    onPress={handleScreenshot}
+                    className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 active:bg-slate-100"
+                  >
+                    <Camera size={18} color="#475569" />
                   </Pressable>
+                  {/* <Pressable className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
+                    <Bell size={18} color="#475569" />
+                  </Pressable> */}
                   <View className="h-9 w-9 items-center justify-center rounded-full bg-[#8E78FF] shadow-sm">
                     <Text className="text-sm font-black text-white">{(userName.charAt(0) || 'U').toUpperCase()}</Text>
                   </View>
