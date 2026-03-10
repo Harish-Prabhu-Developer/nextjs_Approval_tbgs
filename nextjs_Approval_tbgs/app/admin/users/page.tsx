@@ -20,8 +20,10 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAppSelector } from '@/redux/hooks';
 
 const UsersPage = () => {
+    const { user: currentLoginUser } = useAppSelector((state: any) => state.auth);
     const [users, setUsers] = useState<any[]>([]);
     const [dashboardCards, setDashboardCards] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -29,6 +31,10 @@ const UsersPage = () => {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [saving, setSaving] = useState(false);
+
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -150,10 +156,27 @@ const UsersPage = () => {
     };
 
     const filteredUsers = users.filter(user => 
-        user.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (user.id !== currentLoginUser?.id && user.username !== currentLoginUser?.username) &&
+        (user.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
         user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchQuery.toLowerCase())
+        user.email?.toLowerCase().includes(searchQuery.toLowerCase()))
     );
+
+    // Pagination Logic
+    const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        if (val === 'All') {
+            setItemsPerPage(filteredUsers.length > 0 ? filteredUsers.length : 10);
+        } else {
+            setItemsPerPage(Number(val));
+        }
+        setCurrentPage(1); // Reset to first page
+    };
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
     return (
         <div className="space-y-6">
@@ -221,7 +244,7 @@ const UsersPage = () => {
                                         No users found matching your search.
                                     </td>
                                 </tr>
-                            ) : filteredUsers.map((user) => (
+                            ) : currentUsers.map((user) => (
                                 <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center space-x-3">
@@ -289,6 +312,65 @@ const UsersPage = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {!loading && filteredUsers.length > 0 && (
+                    <div className="flex items-center justify-between p-4 border-t border-slate-100 bg-slate-50/50">
+                        <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-slate-500">Show</span>
+                            <select 
+                                className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2 outline-none font-bold"
+                                value={itemsPerPage === filteredUsers.length && filteredUsers.length !== 10 && filteredUsers.length !== 5 && filteredUsers.length !== 25 && filteredUsers.length !== 50 ? 'All' : itemsPerPage}
+                                onChange={handleItemsPerPageChange}
+                            >
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="All">All</option>
+                            </select>
+                            <span className="text-sm font-medium text-slate-500">entries</span>
+                        </div>
+
+                        <div className="flex overflow-x-auto items-center justify-center space-x-4">
+                            <span className="text-sm text-slate-500 font-medium whitespace-nowrap hidden sm:block">
+                                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredUsers.length)} of {filteredUsers.length}
+                            </span>
+                            <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm shrink-0">
+                                <button 
+                                    type="button"
+                                    disabled={currentPage === 1}
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    className="px-3 sm:px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:bg-slate-50 border-r border-slate-200 transition-colors"
+                                >
+                                    Previous
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                    <button
+                                        key={page}
+                                        type="button"
+                                        onClick={() => setCurrentPage(page)}
+                                        className={`px-3 sm:px-4 py-2 text-sm font-bold transition-colors border-x border-slate-200/50 ${
+                                            currentPage === page
+                                            ? 'text-indigo-600 bg-indigo-50/50'
+                                            : 'text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                                <button 
+                                    type="button"
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    className="px-3 sm:px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:bg-slate-50 border-l border-slate-200 transition-colors"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Modal */}
