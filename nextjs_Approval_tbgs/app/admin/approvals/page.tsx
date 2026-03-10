@@ -57,6 +57,10 @@ const ApprovalsManagementPage = () => {
     const [reqLoading, setReqLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('manage'); // 'manage' or 'request'
     
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [currentApproval, setCurrentApproval] = useState<any>(null);
@@ -304,6 +308,22 @@ const ApprovalsManagementPage = () => {
         }
     };
 
+    // Pagination Logic
+    const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        if (val === 'All') {
+            setItemsPerPage(requests.length > 0 ? requests.length : 10);
+        } else {
+            setItemsPerPage(Number(val));
+        }
+        setCurrentPage(1); // Reset to first page
+    };
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentRequests = requests.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(requests.length / itemsPerPage);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -423,7 +443,7 @@ const ApprovalsManagementPage = () => {
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-medium">No approval requests found</td>
                                     </tr>
-                                ) : requests.map((req) => (
+                                ) : currentRequests.map((req) => (
                                     <tr key={req.sno} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-slate-700">{req.poRefNo}</div>
@@ -470,6 +490,65 @@ const ApprovalsManagementPage = () => {
                             </tbody>
                         </table>
                     </div>
+                    
+                    {/* Pagination Controls */}
+                    {!reqLoading && requests.length > 0 && (
+                        <div className="flex items-center justify-between mt-4 px-2">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm font-medium text-slate-500">Show</span>
+                                <select 
+                                    className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2 outline-none font-bold"
+                                    value={itemsPerPage === requests.length && requests.length !== 10 && requests.length !== 5 && requests.length !== 25 && requests.length !== 50 ? 'All' : itemsPerPage}
+                                    onChange={handleItemsPerPageChange}
+                                >
+                                    <option value="5">5</option>
+                                    <option value="10">10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="All">All</option>
+                                </select>
+                                <span className="text-sm font-medium text-slate-500">entries</span>
+                            </div>
+
+                            <div className="flex items-center justify-center space-x-4">
+                                <span className="text-sm text-slate-500 font-medium">
+                                    Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, requests.length)} of {requests.length}
+                                </span>
+                                <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                                    <button 
+                                        type="button"
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:bg-slate-50 border-r border-slate-200 transition-colors"
+                                    >
+                                        Previous
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                        <button
+                                            key={page}
+                                            type="button"
+                                            onClick={() => setCurrentPage(page)}
+                                            className={`px-4 py-2 text-sm font-bold transition-colors border-x border-slate-200/50 ${
+                                                currentPage === page
+                                                ? 'text-indigo-600 bg-indigo-50/50'
+                                                : 'text-slate-600 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {page}
+                                        </button>
+                                    ))}
+                                    <button 
+                                        type="button"
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:bg-slate-50 border-l border-slate-200 transition-colors"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
