@@ -34,6 +34,9 @@ const DashboardCard: React.FC<DashboardCardProps> = ({ card, onClick }) => {
         sky: 'bg-sky-50 text-sky-600 group-hover:bg-sky-100',
         lime: 'bg-lime-50 text-lime-600 group-hover:bg-lime-100',
         fuchsia: 'bg-fuchsia-50 text-fuchsia-600 group-hover:bg-fuchsia-100',
+        green: 'bg-green-50 text-green-600 group-hover:bg-green-100',
+        yellow: 'bg-yellow-50 text-yellow-600 group-hover:bg-yellow-100',
+        slate: 'bg-slate-50 text-slate-600 group-hover:bg-slate-100',
     };
 
     const bgColor = bgColorMap[card.backgroundColor || 'indigo'];

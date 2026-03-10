@@ -131,18 +131,47 @@ function getTableColumns(
             )
         },
         { key: 'sno', label: 'SNO', render: (val: number) => <span className="font-bold text-slate-800">{val}</span> },
-        { key: 'companyId', label: 'Comp ID', render: (val: number) => <span className="text-slate-500 font-semibold">{val}</span> },
+        { 
+            key: 'companyId', 
+            label: 'Company', 
+            render: (id: any) => {
+                // eslint-disable-next-line eqeqeq
+                const company = COMPANY_MASTER.find(c => c.companyId == id);
+                return <span className="text-slate-500 font-semibold">{company?.companyName || id}</span>;
+            }
+        },
         { key: 'poRefNo', label: refLabel, render: (value: string) => <span className="text-[13px] font-bold text-slate-700">{value}</span> },
         {
             key: 'purchaseType', label: typeLabel, render: (value: string) => (
-                <span className="px-2.5 py-1 text-[11px] font-bold rounded bg-emerald-100 text-emerald-700">
-                    {value}
+                <span className="px-2.5 py-1 text-[11px] font-bold rounded bg-emerald-100 text-emerald-700 uppercase">
+                    {value || 'LOCAL'}
                 </span>
             )
         },
-        { key: 'supplierId', label: 'Supplier', render: (value: string) => <span className="text-[12px] font-bold text-slate-700 leading-tight uppercase max-w-[150px] block">{value}</span> },
-        { key: 'poStoreId', label: 'Dept', responsiveClass: 'hidden md:table-cell' },
-        { key: 'totalFinalProductionHdrAmount', label: 'Amount', render: (value: number, row: any) => <span className="font-black text-slate-900 text-[14px]">{value?.toLocaleString()} {row.currencyType}</span> },
+        { 
+            key: 'supplierId', 
+            label: 'Supplier', 
+            render: (value: any) => {
+                // eslint-disable-next-line eqeqeq
+                const supplier = SUPPLIER_MASTER.find(s => s.supplierId == value);
+                return (
+                    <span className="text-[12px] font-bold text-slate-700 leading-tight uppercase max-w-[150px] block truncate" title={supplier?.supplierName}>
+                        {supplier?.supplierName || value}
+                    </span>
+                );
+            }
+        },
+        { 
+            key: 'poStoreId', 
+            label: 'Dept', 
+            responsiveClass: 'hidden md:table-cell',
+            render: (id: any) => {
+                // eslint-disable-next-line eqeqeq
+                const store = STORE_MASTER.find(s => s.storeId == id);
+                return <span className="text-slate-600 font-medium">{store?.storeName || id}</span>;
+            }
+        },
+        { key: 'amount', label: 'Amount', render: (value: number, row: any) => <span className="font-black text-slate-900 text-[14px]">{value?.toLocaleString()} {row.currencyType}</span> },
         {
             key: 'requestedBy',
             label: 'Requested By',
@@ -171,11 +200,22 @@ function getTableColumns(
         {
             key: 'finalResponseStatus',
             label: 'Status',
-            render: (val: string) => (
-                <span className={`px-2 py-1 text-[10px] font-bold rounded ${val === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {val}
-                </span>
-            )
+            render: (val: string, row: any) => {
+                // Fallback to statusEntry for admin-created requests
+                const status = val || row?.statusEntry || 'PENDING';
+                const colors: Record<string, string> = {
+                    'APPROVED': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                    'REJECTED': 'bg-rose-100 text-rose-700 border-rose-200',
+                    'PENDING': 'bg-amber-100 text-amber-700 border-amber-200',
+                    'HOLD': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+                };
+                
+                return (
+                    <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border shadow-sm ${colors[status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                        {status}
+                    </span>
+                );
+            }
         }
     ];
 }
@@ -225,22 +265,41 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
         }
     }, [dispatch, approvalType]);
 
-    const confirmStatusChange = () => {
+    const confirmStatusChange = async () => {
         if (!pendingStatusUpdate || !remarksInput.trim()) return;
 
         setIsLoading(true);
+        try {
+            const response = await fetch(`/api/approvals/${approvalType}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ids: pendingStatusUpdate.ids,
+                    status: pendingStatusUpdate.status,
+                    remarks: remarksInput
+                })
+            });
 
-        setTimeout(() => {
-            toast.success(
-                `${pendingStatusUpdate.ids.length} request(s) marked as ${pendingStatusUpdate.status}`
-            );
-
-            setSelectedRows([]);
-            setPendingStatusUpdate(null);
-            setRemarksInput("");
-            setIsRemarksModalOpen(false);
+            if (response.ok) {
+                toast.success(
+                    `${pendingStatusUpdate.ids.length} request(s) marked as ${pendingStatusUpdate.status}`
+                );
+                // Refresh data
+                dispatch(fetchApprovalRecords(approvalType));
+                
+                setSelectedRows([]);
+                setPendingStatusUpdate(null);
+                setRemarksInput("");
+                setIsRemarksModalOpen(false);
+            } else {
+                toast.error('Failed to update status');
+            }
+        } catch (error) {
+            console.error('Status update failed:', error);
+            toast.error('Network error during status update');
+        } finally {
             setIsLoading(false);
-        }, 800);
+        }
     };
 
     const handleViewConversation = React.useCallback((row: any) => {
@@ -506,29 +565,29 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                 ...item,
                 id: item.sno, // Map sno to id for compatibility
                 pendingDays: diffDays,
-                amount: item.totalFinalProductionHdrAmount // Map for filters compatibility
+                amount: item.totalFinalProductionHdrAmount, // Map for filters compatibility
+                // Normalize status: use finalResponseStatus, fall back to statusEntry
+                finalResponseStatus: item.finalResponseStatus || item.statusEntry || 'PENDING'
             };
         });
 
         if (Object.keys(filters).length === 0) return data;
 
         return data.filter((item: any) => {
-            // 1. Company Filter
-            if (filters.company && item.companyId?.toString() !== filters.company) return false;
+            // 1. Company Filter (exact ID match)
+            if (filters.company && item.companyId?.toString() !== filters.company.toString()) return false;
 
             // 2. Purchase Type Filter
             if (filters.purchaseType && filters.purchaseType !== 'all' && item.purchaseType?.toLowerCase() !== filters.purchaseType.toLowerCase()) return false;
 
-            // 3. Supplier Filter
+            // 3. Supplier Filter (exact ID match)
             if (filters.supplier && filters.supplier !== 'all') {
-                const supplierMatch = item.supplierId?.toString().includes(filters.supplier);
-                if (!supplierMatch) return false;
+                if (item.supplierId?.toString() !== filters.supplier.toString()) return false;
             }
 
-            // 4. Department Filter
+            // 4. Department Filter (exact ID match)
             if (filters.department && filters.department !== 'all') {
-                const deptMatch = item.poStoreId?.toString().includes(filters.department);
-                if (!deptMatch) return false;
+                if (item.poStoreId?.toString() !== filters.department.toString()) return false;
             }
 
             // 5. Status Filter
@@ -545,9 +604,26 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
 
             // 8. Amount Range Filters
             if (filters.minAmount || filters.maxAmount) {
-                const numericAmount = item.totalFinalProductionHdrAmount;
+                const numericAmount = item.amount;
                 if (filters.minAmount && numericAmount < parseFloat(filters.minAmount)) return false;
                 if (filters.maxAmount && numericAmount > parseFloat(filters.maxAmount)) return false;
+            }
+
+            // 9. Date Range Filters
+            if (filters.searchFrom || filters.searchTo) {
+                const itemDate = new Date(item.createdDate || item.poDate || new Date());
+                itemDate.setHours(0, 0, 0, 0);
+
+                if (filters.searchFrom) {
+                    const fromDate = new Date(filters.searchFrom);
+                    fromDate.setHours(0, 0, 0, 0);
+                    if (itemDate < fromDate) return false;
+                }
+                if (filters.searchTo) {
+                    const toDate = new Date(filters.searchTo);
+                    toDate.setHours(23, 59, 59, 999);
+                    if (itemDate > toDate) return false;
+                }
             }
 
             return true;
@@ -604,10 +680,22 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                         filterOptions={useMemo(() => {
                             const rawData = records || [];
                             return {
-                                companies: Array.from(new Set(rawData.map((i: any) => i.companyId))).filter(Boolean).map(String),
+                                companies: Array.from(new Set(rawData.map((i: any) => i.companyId))).filter(Boolean).map(id => {
+                                    // eslint-disable-next-line eqeqeq
+                                    const company = COMPANY_MASTER.find(c => c.companyId == id);
+                                    return { id, name: company?.companyName || String(id) };
+                                }),
                                 purchaseTypes: Array.from(new Set(rawData.map((i: any) => i.purchaseType))).filter(Boolean).map(String),
-                                suppliers: Array.from(new Set(rawData.map((i: any) => i.supplierId))).filter(Boolean).map(String),
-                                departments: Array.from(new Set(rawData.map((i: any) => i.poStoreId))).filter(Boolean).map(String)
+                                suppliers: Array.from(new Set(rawData.map((i: any) => i.supplierId))).filter(Boolean).map(id => {
+                                    // eslint-disable-next-line eqeqeq
+                                    const supplier = SUPPLIER_MASTER.find(s => s.supplierId == id);
+                                    return { id, name: supplier?.supplierName || String(id) };
+                                }),
+                                departments: Array.from(new Set(rawData.map((i: any) => i.poStoreId))).filter(Boolean).map(id => {
+                                    // eslint-disable-next-line eqeqeq
+                                    const store = STORE_MASTER.find(s => s.storeId == id);
+                                    return { id, name: store?.storeName || String(id) };
+                                })
                             };
                         }, [records])}
                     />
@@ -740,21 +828,34 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Organization Unit</span>
                                             <div className="flex items-center space-x-2">
-                                                <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                                                <span className="text-[14px] font-bold text-slate-800">{row.companyId}</span>
+                                                <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]"></div>
+                                                <span className="text-[14px] font-bold text-slate-800">
+                                                    {/* eslint-disable-next-line eqeqeq */}
+                                                    {COMPANY_MASTER.find(c => c.companyId == row.companyId)?.companyName || row.companyId}
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="flex flex-col border-l border-slate-100 pl-8">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Financial Axis</span>
-                                            <p className="text-[14px] font-bold text-slate-800 uppercase">{row.currencyType} Base</p>
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Currency Axis</span>
+                                            <p className="text-[14px] font-bold text-slate-800 uppercase flex items-center space-x-1.5">
+                                                <span className="text-slate-400 font-medium">{row.currencyType || 'USD'}</span>
+                                                <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px]">BASE</span>
+                                            </p>
                                         </div>
                                         <div className="flex flex-col border-l border-slate-100 pl-8">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Operational Dept</span>
-                                            <p className="text-[14px] font-bold text-slate-800">{row.poStoreId}</p>
+                                            <p className="text-[14px] font-bold text-slate-800">
+                                                {/* eslint-disable-next-line eqeqeq */}
+                                                {STORE_MASTER.find(s => s.storeId == row.poStoreId)?.storeName || row.poStoreId}
+                                            </p>
                                         </div>
                                         <div className="flex flex-col border-l border-slate-100 pl-8">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Source Record ID</span>
-                                            <p className="text-[14px] font-bold text-slate-800">#{row.sno?.toString().padStart(4, '0')}</p>
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Source Record</span>
+                                            <p className="text-[14px] font-bold text-slate-800 flex items-center space-x-1.5">
+                                                <span className="text-indigo-600">#{row.sno?.toString().padStart(4, '0')}</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
+                                                <span className="text-slate-500">{row.poRefNo}</span>
+                                            </p>
                                         </div>
                                     </div>
 
@@ -940,12 +1041,6 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                     </div>
                 </div>
             )}
-            <PdfViewerModal
-                isOpen={isPdfModalOpen}
-                onClose={() => setIsPdfModalOpen(false)}
-                pdfData={currentPdfData}
-                title={currentPdfTitle}
-            />
         </>
     );
 };

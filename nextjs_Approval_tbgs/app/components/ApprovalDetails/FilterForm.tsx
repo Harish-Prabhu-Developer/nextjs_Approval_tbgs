@@ -15,8 +15,8 @@ import {
 interface FilterFormProps {
     filters?: Record<string, any>;
     filterOptions?: {
-        companies?: string[];
-        purchaseTypes?: string[];
+        companies?: any[];
+        purchaseTypes?: any[];
         suppliers?: any[];
         departments?: any[];
     };
@@ -48,10 +48,10 @@ const FilterForm: React.FC<FilterFormProps> = ({
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
     const {
-        companies = [],
-        purchaseTypes = [],
-        suppliers = [],
-        departments = []
+        companies = [] as any[],
+        purchaseTypes = [] as any[],
+        suppliers = [] as any[],
+        departments = [] as any[]
     } = filterOptions;
 
     useEffect(() => {
@@ -128,9 +128,11 @@ const FilterForm: React.FC<FilterFormProps> = ({
                                 className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
                             >
                                 <option value="">All Companies</option>
-                                {companies.map(val => (
-                                    <option key={val} value={val}>{val === 'az' ? 'AZ Group' : val === 'ab' ? 'AB Logistics' : val}</option>
-                                ))}
+                                {companies.map(opt => {
+                                    const id = typeof opt === 'object' ? opt.id : opt;
+                                    const name = typeof opt === 'object' ? (opt.name || opt.label) : (opt === 'az' ? 'AZ Group' : opt === 'ab' ? 'AB Logistics' : opt);
+                                    return <option key={id} value={id}>{name}</option>;
+                                })}
                             </select>
                             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         </div>
@@ -141,7 +143,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                             <select
                                 value={localFilters.purchaseType || ""}
                                 onChange={(e) => handleChange("purchaseType", e.target.value)}
-                                className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
+                                className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 uppercase"
                             >
                                 <option value="">All Types</option>
                                 {purchaseTypes.map(val => (
@@ -160,9 +162,11 @@ const FilterForm: React.FC<FilterFormProps> = ({
                                 className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
                             >
                                 <option value="">All Suppliers</option>
-                                {suppliers.map(val => (
-                                    <option key={val} value={val}>{val === 'vision' ? 'Vision Infotech' : val === 'addamo' ? 'Addamo Hardware' : val}</option>
-                                ))}
+                                {suppliers.map(opt => {
+                                    const id = typeof opt === 'object' ? opt.id : opt;
+                                    const name = typeof opt === 'object' ? (opt.name || opt.label) : (opt === 'vision' ? 'Vision Infotech' : opt === 'addamo' ? 'Addamo Hardware' : opt);
+                                    return <option key={id} value={id}>{name}</option>;
+                                })}
                             </select>
                             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         </div>
@@ -176,9 +180,11 @@ const FilterForm: React.FC<FilterFormProps> = ({
                                 className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-[14px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
                             >
                                 <option value="">All Departments</option>
-                                {departments.map(val => (
-                                    <option key={val} value={val}>{val === 'medical' ? 'AZ Medical' : val === 'flexible' ? 'Flexible Packaging' : val}</option>
-                                ))}
+                                {departments.map(opt => {
+                                    const id = typeof opt === 'object' ? opt.id : opt;
+                                    const name = typeof opt === 'object' ? (opt.name || opt.label) : (opt === 'medical' ? 'AZ Medical' : opt === 'flexible' ? 'Flexible Packaging' : opt);
+                                    return <option key={id} value={id}>{name}</option>;
+                                })}
                             </select>
                             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         </div>

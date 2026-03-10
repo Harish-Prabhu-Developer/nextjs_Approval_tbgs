@@ -10,17 +10,19 @@ import {
     LayoutDashboard,
     ShoppingCart,
     Briefcase,
-    MessageCircle
+    MessageCircle,
+    Users,
+    Settings
 } from 'lucide-react';
+import * as Icons from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
 import Breadcrumbs from './components/Breadcrumbs';
 import Footer from './components/Footer';
 import FullscreenToggle from './components/FullscreenToggle';
 
-import { DASHBOARD_CARDS } from './config/mockData';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
-import { fetchApprovalCounts } from '@/redux/slices/dashboardSlice';
+import { fetchApprovalCounts, fetchDashboardCards } from '@/redux/slices/dashboardSlice';
 import { logout, setAuth } from '@/redux/slices/authSlice';
 
 interface MenuItem {
@@ -35,22 +37,17 @@ interface MenuItem {
 const STATIC_MENU_ITEMS: MenuItem[] = [
     { id: "dashboard", name: "Dashboard", pendingCount: 0, icon: "LayoutDashboard", path: "/dashboard", permissionColumn: "" },
     { id: "chat", name: "Messenger", pendingCount: 0, icon: "MessageCircle", path: "/chat", permissionColumn: "" },
-    ...DASHBOARD_CARDS.map((card: any) => ({
-        id: card.sno.toString(),
-        name: card.cardTitle,
-        pendingCount: 0,
-        icon: card.iconKey,
-        path: `/${card.routeSlug}`,
-        permissionColumn: card.permissionColumn
-    }))
 ];
 
-const iconMap: Record<string, any> = {
-    LayoutDashboard,
-    ShoppingCart,
-    Briefcase,
-    MessageCircle
-};
+const ADMIN_MENU_ITEMS: MenuItem[] = [
+    { id: "admin-users", name: "Manage Users", pendingCount: 0, icon: "Users", path: "/admin/users", permissionColumn: "admin" },
+    { id: "admin-companies", name: "Manage Companies", pendingCount: 0, icon: "Building2", path: "/admin/companies", permissionColumn: "admin" },
+    { id: "admin-suppliers", name: "Manage Suppliers", pendingCount: 0, icon: "Truck", path: "/admin/suppliers", permissionColumn: "admin" },
+    { id: "admin-products", name: "Manage Products", pendingCount: 0, icon: "Package", path: "/admin/products", permissionColumn: "admin" },
+    { id: "admin-trucks", name: "Manage Trucks", pendingCount: 0, icon: "Navigation", path: "/admin/trucks", permissionColumn: "admin" },
+    { id: "admin-approvals", name: "Manage Approvals", pendingCount: 0, icon: "Settings", path: "/admin/approvals", permissionColumn: "admin" },
+];
+
 
 export default function Template({ children }: { children: React.ReactNode }) {
     const dispatch = useAppDispatch();
@@ -58,7 +55,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
     const router = useRouter();
 
     const { user, isAuthenticated } = useAppSelector((state: any) => state.auth);
-    const { counts } = useAppSelector((state: any) => state.dashboard);
+    const { counts, cards, cardsLoading } = useAppSelector((state: any) => state.dashboard);
 
     const [isSidebarOpen, setSidebarOpen] = useState(true);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -97,33 +94,44 @@ export default function Template({ children }: { children: React.ReactNode }) {
         }
     }, [pathname, router]);
 
-    // Fetch counts when authenticated
+    // Fetch counts and cards when authenticated
     useEffect(() => {
         if (isAuthenticated && pathname && pathname !== "/qrscan" && pathname !== "/login") {
             dispatch(fetchApprovalCounts());
+            dispatch(fetchDashboardCards());
         }
     }, [dispatch, isAuthenticated, pathname]);
 
-    // Update menu items based on counts and permissions from Redux
+    // Update menu items based on counts, cards and permissions from Redux
     useEffect(() => {
         if (!user) {
-            // If not logged in, just show dashboard or empty
             setMenuItems(STATIC_MENU_ITEMS.filter(item => item.id === "dashboard"));
             return;
         }
 
-        const updatedMenu = STATIC_MENU_ITEMS.map(item => {
-            if (item.id === "dashboard") return item;
+        const dynamicItems = (cards || []).map((card: any) => ({
+            id: `approval-${card.sno}`,
+            name: card.cardTitle,
+            pendingCount: getPendingCount(card.permissionColumn, `/${card.routeSlug}`),
+            icon: card.iconKey,
+            path: `/${card.routeSlug}`,
+            permissionColumn: card.permissionColumn
+        })).filter((item: MenuItem) => 
+            user.role?.toLowerCase() === 'admin' || 
+            user.permissions?.includes(item.permissionColumn || '')
+        );
 
-            const count = getPendingCount(item.permissionColumn, item.path);
-            return { ...item, pendingCount: count };
-        }).filter(item => {
-            if (item.id === "dashboard" || item.id === "chat") return true;
-            return user.permissions?.includes(item.permissionColumn || '');
-        });
+        let updatedMenu = [...STATIC_MENU_ITEMS.map(item => ({ ...item, pendingCount: getPendingCount(item.permissionColumn, item.path) }))];
+        
+        updatedMenu = [...updatedMenu, ...dynamicItems];
+
+        if (user.role?.toLowerCase() === 'admin') {
+            updatedMenu = [...updatedMenu, ...ADMIN_MENU_ITEMS];
+        }
 
         setMenuItems(updatedMenu);
-    }, [counts, user]);
+        setIsMenuLoading(cardsLoading);
+    }, [counts, cards, user, cardsLoading]);
 
     const handleLogout = () => {
         dispatch(logout());
@@ -219,7 +227,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
                         ))
                     ) : (
                         menuItems.map((item) => {
-                            const Icon = iconMap[item.icon as keyof typeof iconMap] || LayoutDashboard;
+                            const Icon = (Icons as any)[item.icon] || LayoutDashboard;
                             const hasPendingItems = item.pendingCount > 0;
                             const isActive = pathname ? (pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(`${item.path}/`))) : false;
 

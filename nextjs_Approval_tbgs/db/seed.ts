@@ -26,7 +26,7 @@ async function main() {
       username: "User1",
       password: "User1@123",
       name: "User1",
-      role: "User",
+      role: "user",
       email: "User1@visioninfotech.co.tz",
       permissions: ["poApproval", "workOrderApproval"],
     },
@@ -35,7 +35,7 @@ async function main() {
       username: "User2",
       password: "User2@123",
       name: "User2",
-      role: "User",
+      role: "user",
       email: "User2@visioninfotech.co.tz",
       permissions: ["priceApproval"],
     },
@@ -44,17 +44,16 @@ async function main() {
       username: "User3",
       password: "User3@123",
       name: "User3",
-      role: "User",
+      role: "user",
       email: "User3@visioninfotech.co.tz",
       permissions: ["poApproval", "workOrderApproval", "salesReturnApproval"],
     },
-  
     {
       id: 4,
       username: "sri",
       password: "ana",
       name: "Srinivas",
-      role: "User",
+      role: "admin",
       email: "Sri@visioninfotech.co.tz",
       permissions: ["priceApproval", "poApproval", "workOrderApproval", "salesReturnApproval"],
     },
@@ -63,7 +62,7 @@ async function main() {
       username: "User4",
       password: "User4@123",
       name: "User4",
-      role: "User",
+      role: "user",
       email: "User4@visioninfotech.co.tz",
       permissions: ["poApproval", "workOrderApproval", "salesReturnApproval"],
     },
@@ -72,11 +71,10 @@ async function main() {
       username: "User5",
       password: "User5@123",
       name: "User5",
-      role: "User",
+      role: "user",
       email: "User5@visioninfotech.co.tz",
       permissions: ["poApproval", "workOrderApproval", "salesReturnApproval"],
     }
-    
   ]);
 
   // 2. Dashboard Cards
@@ -84,7 +82,7 @@ async function main() {
   await db.insert(schema.dashboardCards).values(
     DASHBOARD_CARDS.map(card => ({
       ...card,
-      approvalType: card.routeSlug // Assuming routeSlug matches approvalType
+      approvalType: card.routeSlug
     }))
   );
 

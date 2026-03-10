@@ -9,9 +9,12 @@ import {
   boolean,
   date,
   serial,
-  jsonb
+  jsonb,
+  pgEnum
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+
+export const roleEnum = pgEnum("user_role", ["admin", "user"]);
 
 // -------------------- Users & UI --------------------
 export const users = pgTable("tbl_users", {
@@ -19,7 +22,7 @@ export const users = pgTable("tbl_users", {
   username: varchar("username", { length: 64 }).notNull(),
   password: varchar("password", { length: 128 }).notNull(),
   name: varchar("name", { length: 128 }).notNull(),
-  role: varchar("role", { length: 64 }).notNull(),
+  role: roleEnum("role").notNull().default("user"),
   email: varchar("email", { length: 128 }).notNull(),
   permissions: text("permissions").array().notNull(), // e.g. ["poApproval", "workOrderApproval"]
   isActive: boolean("is_active").default(true),

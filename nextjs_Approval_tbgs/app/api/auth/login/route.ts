@@ -29,7 +29,7 @@ export async function POST(request: Request) {
                 id: 1,
                 username: 'admin',
                 name: 'Administrator',
-                role: 'ADMIN',
+                role: 'admin',
                 email: 'admin@tbgs.co.tz',
                 permissions: ["poApproval", "workOrderApproval", "priceApproval", "salesReturnApproval"]
             };

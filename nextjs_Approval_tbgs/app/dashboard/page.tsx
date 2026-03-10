@@ -7,18 +7,15 @@ import { Loader2, RefreshCw, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 import DashboardCard from "../components/DashboardCard";
 
-import { DASHBOARD_CARDS } from "../config/mockData";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import { fetchApprovalCounts } from "@/redux/slices/dashboardSlice";
+import { fetchApprovalCounts, fetchDashboardCards } from "@/redux/slices/dashboardSlice";
 
 const DashboardPage = () => {
     const router = useRouter();
     const dispatch = useAppDispatch();
 
     const { user } = useAppSelector((state: any) => state.auth);
-    const { counts, loading } = useAppSelector((state: any) => state.dashboard);
-
-    const [cards, setCards] = useState([]);
+    const { counts, cards, loading } = useAppSelector((state: any) => state.dashboard);
 
     const getPendingCount = (card: any) => {
         const permissionCount = Number(counts?.[card.permissionColumn] ?? 0);
@@ -28,16 +25,8 @@ const DashboardPage = () => {
     };
 
     useEffect(() => {
-        if (user) {
-            const filteredCards = DASHBOARD_CARDS.filter((card: any) =>
-                user.permissions?.includes(card.permissionColumn)
-            );
-            setCards(filteredCards as any);
-        }
-    }, [user]);
-
-    useEffect(() => {
         dispatch(fetchApprovalCounts());
+        dispatch(fetchDashboardCards());
     }, [dispatch]);
 
     const handleCardClick = (card: any) => {
@@ -61,7 +50,11 @@ const DashboardPage = () => {
         );
     }
 
-    const cardsWithCounts = cards.map((card: any) => ({
+    const filteredCards = (cards || []).filter((card: any) =>
+        user?.role === 'admin' || user?.permissions?.includes(card.permissionColumn)
+    );
+
+    const cardsWithCounts = filteredCards.map((card: any) => ({
         ...card,
         id: card.sno || card.id,
         title: card.cardTitle,
@@ -92,7 +85,7 @@ const DashboardPage = () => {
                     </button>
                 </div>
 
-                {cardsWithCounts.length === 0 ? (
+                {cardsWithCounts.length === 0 && !loading ? (
                     <div className="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
                         <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <FileText className="h-10 w-10 text-gray-400" />

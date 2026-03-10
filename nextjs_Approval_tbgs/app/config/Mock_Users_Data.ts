@@ -5,7 +5,7 @@ export const MOCK_USERS = [
         username: "User1",
         password: "User1@123",
         name: "User1",
-        role: "User",
+        role: "user",
         email: "User1@visioninfotech.co.tz",
         permissions: ["poApproval", "workOrderApproval"]
     },
@@ -14,7 +14,7 @@ export const MOCK_USERS = [
         username: "User2",
         password: "User2@123",
         name: "User2",
-        role: "User",
+        role: "user",
         email: "User2@visioninfotech.co.tz",
         permissions: ["priceApproval"]
     },
@@ -23,7 +23,7 @@ export const MOCK_USERS = [
         username: "User3",
         password: "User3@123",
         name: "User3",
-        role: "User",
+        role: "user",
         email: "User3@visioninfotech.co.tz",
         permissions: ["poApproval", "workOrderApproval", "salesReturnApproval"]
     },
@@ -32,7 +32,7 @@ export const MOCK_USERS = [
         username: "sri",
         password: "ana",
         name: "Srinivas",
-        role: "User",
+        role: "admin",
         email: "Sri@visioninfotech.co.tz",
         permissions: ["priceApproval", "poApproval", "workOrderApproval", "salesReturnApproval"]
     }
