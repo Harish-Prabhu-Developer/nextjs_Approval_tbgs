@@ -13,10 +13,12 @@ import {
   Platform,
   Pressable,
   Text,
+  Modal,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -208,6 +210,11 @@ export default function ChatDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  // Viewer State
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [viewerType, setViewerType] = useState<'image' | 'pdf' | 'other' | null>(null);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => {
@@ -551,6 +558,18 @@ export default function ChatDetailScreen() {
     setSelectedMessageIds([]);
   };
 
+  const openViewer = (url: string, type: string) => {
+    setViewerUrl(url);
+    if (type.startsWith('image/')) {
+      setViewerType('image');
+    } else if (url.toLowerCase().endsWith('.pdf') || type === 'application/pdf') {
+      setViewerType('pdf');
+    } else {
+      setViewerType('other');
+    }
+    setViewerVisible(true);
+  };
+
   const renderMessage = ({ item }: { item: ChatRow }) => {
     if (item.type === 'date') {
       return (
@@ -615,14 +634,14 @@ export default function ChatDetailScreen() {
           )}
 
           {item.fileUrl && isImage && (
-            <TouchableOpacity onPress={() => Linking.openURL(item.fileUrl!)}>
+            <TouchableOpacity onPress={() => openViewer(item.fileUrl!, item.fileType!)}>
               <Image source={{ uri: item.fileUrl }} style={{ width: 220, height: 180, borderRadius: 12 }} />
             </TouchableOpacity>
           )}
 
           {item.fileUrl && !isImage && (
             <TouchableOpacity
-              onPress={() => Linking.openURL(item.fileUrl!)}
+              onPress={() => openViewer(item.fileUrl!, item.fileType!)}
               className={`flex-row items-center p-3 rounded-xl border ${isOwn ? 'bg-white/10 border-white/20' : 'bg-slate-50 border-slate-100'}`}
             >
               <View className={`p-2 rounded-lg mr-2 ${isOwn ? 'bg-white/20' : 'bg-indigo-100'}`}>
@@ -904,6 +923,69 @@ export default function ChatDetailScreen() {
         open={showEmojiPicker}
         onClose={() => setShowEmojiPicker(false)}
       />
+
+      {/* Internal File Viewer Modal */}
+      <Modal
+        visible={viewerVisible}
+        transparent={false}
+        animationType="slide"
+        onRequestClose={() => setViewerVisible(false)}
+      >
+        <View className="flex-1 bg-black">
+          <View className="flex-row items-center justify-between px-4 h-16 border-b border-white/10" style={{ paddingTop: insets.top }}>
+            <TouchableOpacity onPress={() => setViewerVisible(false)} className="p-2">
+              <ChevronLeft size={28} color="white" />
+            </TouchableOpacity>
+            <Text className="text-white font-black uppercase tracking-widest text-xs">
+              {viewerType === 'image' ? 'Image Viewer' : viewerType === 'pdf' ? 'PDF Viewer' : 'File Preview'}
+            </Text>
+            <TouchableOpacity 
+              onPress={() => viewerUrl && Linking.openURL(viewerUrl)}
+              className="p-2"
+            >
+              <Download size={20} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          <View className="flex-1 items-center justify-center">
+            {viewerType === 'image' && viewerUrl && (
+              <Image 
+                source={{ uri: viewerUrl }} 
+                style={{ width: '100%', height: '100%' }} 
+                resizeMode="contain" 
+              />
+            )}
+            {viewerType === 'pdf' && viewerUrl && (
+              <WebView
+                source={{ 
+                  uri: Platform.OS === 'android' 
+                    ? `https://docs.google.com/viewer?url=${encodeURIComponent(viewerUrl)}&embedded=true` 
+                    : viewerUrl 
+                }}
+                style={{ flex: 1, width: '100%', backgroundColor: '#000' }}
+                startInLoadingState={true}
+                renderLoading={() => (
+                  <View className="absolute inset-0 items-center justify-center bg-black">
+                    <ActivityIndicator size="large" color="#6366f1" />
+                  </View>
+                )}
+              />
+            )}
+            {viewerType === 'other' && (
+              <View className="items-center px-10">
+                <File size={80} color="white" strokeWidth={1} />
+                <Text className="text-white text-center mt-6 font-bold">This file type cannot be previewed inside the app.</Text>
+                <TouchableOpacity 
+                  onPress={() => viewerUrl && Linking.openURL(viewerUrl)}
+                  className="mt-8 bg-indigo-600 px-8 py-4 rounded-2xl"
+                >
+                  <Text className="text-white font-black uppercase tracking-widest text-xs">Open in Browser</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

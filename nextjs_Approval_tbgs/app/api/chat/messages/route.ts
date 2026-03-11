@@ -51,19 +51,20 @@ export async function POST(request: Request) {
 
         const createdMessage = newMessage[0];
 
-        // Send Push Notification asynchronoulsy
+        // Send Push Notification asynchronoulsy (WhatsApp style)
         void (async () => {
             try {
                 const [sender] = await db.select().from(users).where(eq(users.id, senderId));
                 if (sender) {
                     await sendPushNotification(
                         receiverId,
-                        `New message from ${sender.name}`,
-                        message || (fileUrl ? 'Sent a file' : 'New message'),
+                        sender.name, // Title is Sender Name
+                        message || (fileUrl ? 'Sent a file' : 'New message'), // Body is message
                         { 
                             type: 'chat_message', 
                             messageId: createdMessage.id,
-                            senderId: senderId
+                            senderId: senderId,
+                            senderName: sender.name
                         }
                     );
                 }

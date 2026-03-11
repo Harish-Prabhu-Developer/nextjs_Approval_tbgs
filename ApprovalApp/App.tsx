@@ -13,6 +13,7 @@ import { hydrateAuth } from './src/redux/slices/authSlice';
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from './src/utils/notifications';
 import { useRef, useState } from 'react';
+import { navigationRef } from './src/navigation/NavigationService';
 
 function AppContent() {
   const dispatch = useAppDispatch();
@@ -42,7 +43,22 @@ function AppContent() {
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Notification Response:', response);
+      const { data } = response.notification.request.content;
+      console.log('Notification Tapped:', data);
+      
+      if (data && data.type === 'chat_message' && data.senderId) {
+        // Navigate to ChatDetail
+        if (navigationRef.isReady()) {
+          // If we are logged in, we can navigate
+          navigationRef.navigate('App', {
+            screen: 'ChatDetail',
+            params: {
+              userId: Number(data.senderId),
+              name: data.senderName || 'Chat'
+            }
+          } as any);
+        }
+      }
     });
 
     return () => {
@@ -65,7 +81,7 @@ function AppContent() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
           <RootNavigator isLoggedIn={isAuthenticated} />
         </NavigationContainer>
       </SafeAreaProvider>

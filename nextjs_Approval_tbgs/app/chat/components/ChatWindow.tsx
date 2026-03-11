@@ -71,6 +71,12 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
     const [messageMenuData, setMessageMenuData] = useState<{ message: Message, x: number, y: number } | null>(null);
     const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
     const [showStatusAlt, setShowStatusAlt] = useState(false);
+    
+    // Viewer State
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+    const [viewerType, setViewerType] = useState<'image' | 'pdf' | 'other' | null>(null);
+    const [viewerName, setViewerName] = useState<string>('');
     const scrollRef = useRef<HTMLDivElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -373,6 +379,19 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
             }
         }
     }, [onDeleteMessage]);
+
+    const openViewer = (url: string, type: string | undefined, fileName: string | undefined) => {
+        setViewerUrl(url);
+        setViewerName(fileName || 'File Preview');
+        if (type?.startsWith('image/')) {
+            setViewerType('image');
+        } else if (url.toLowerCase().endsWith('.pdf') || type === 'application/pdf') {
+            setViewerType('pdf');
+        } else {
+            setViewerType('other');
+        }
+        setViewerVisible(true);
+    };
 
     if (!recipient) {
         return (
@@ -713,14 +732,16 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                                             src={item.fileUrl}
                                                             alt={item.fileName}
                                                             className="max-h-60 w-full object-cover cursor-pointer hover:scale-105 transition-transform duration-500"
-                                                            onClick={() => window.open(item.fileUrl, '_blank')}
+                                                            onClick={() => openViewer(item.fileUrl!, item.fileType, item.fileName)}
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <a
-                                                        href={item.fileUrl}
-                                                        target="_blank"
-                                                        className={`flex items-center space-x-3 p-3 rounded-xl border transition-all ${isOwn ? 'bg-white/10 border-white/20 hover:bg-white/20' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
+                                                    <div
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            openViewer(item.fileUrl!, item.fileType, item.fileName);
+                                                        }}
+                                                        className={`flex items-center space-x-3 p-3 rounded-xl border transition-all cursor-pointer ${isOwn ? 'bg-white/10 border-white/20 hover:bg-white/20' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
                                                             }`}
                                                     >
                                                         <div className={`p-2 rounded-lg ${isOwn ? 'bg-white/20' : 'bg-indigo-100'}`}>
@@ -731,7 +752,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                                             <p className={`text-[10px] ${isOwn ? 'text-white/60' : 'text-slate-400'}`}>Document</p>
                                                         </div>
                                                         <Download size={18} className={isOwn ? 'text-white/60' : 'text-slate-300'} />
-                                                    </a>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
@@ -968,6 +989,92 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                             )}
                         </motion.div>
                     </>
+                )}
+            </AnimatePresence>
+
+            {/* In-App File Viewer Modal */}
+            <AnimatePresence>
+                {viewerVisible && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-200 flex flex-col bg-slate-900/95 backdrop-blur-xl"
+                    >
+                        {/* Viewer Header */}
+                        <div className="flex items-center justify-between px-6 h-18 border-b border-white/10 bg-slate-900/50">
+                            <div className="flex items-center space-x-4">
+                                <button
+                                    onClick={() => setViewerVisible(false)}
+                                    className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-white group"
+                                >
+                                    <X size={22} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform" />
+                                </button>
+                                <div>
+                                    <h4 className="text-white font-black text-sm tracking-tight">{viewerName}</h4>
+                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                                        {viewerType === 'image' ? 'Image Viewer' : viewerType === 'pdf' ? 'PDF Preview' : 'File Preview'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <a
+                                    href={viewerUrl!}
+                                    download={viewerName}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-500/20"
+                                >
+                                    <DownloadCloud size={18} strokeWidth={2.5} />
+                                    <span className="text-xs font-black uppercase tracking-widest hidden sm:inline">Download</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        {/* Viewer Content */}
+                        <div className="flex-1 overflow-hidden flex items-center justify-center p-4 sm:p-10">
+                            {viewerType === 'image' && viewerUrl && (
+                                <motion.img
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    src={viewerUrl}
+                                    alt={viewerName}
+                                    className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+                                />
+                            )}
+
+                            {viewerType === 'pdf' && viewerUrl && (
+                                <motion.iframe
+                                    initial={{ y: 20, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    src={`${viewerUrl}#toolbar=0`}
+                                    className="w-full h-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden border-none"
+                                />
+                            )}
+
+                            {viewerType === 'other' && (
+                                <motion.div
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="text-center p-12 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-md max-w-md w-full"
+                                >
+                                    <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+                                        <File size={48} className="text-white" strokeWidth={1.5} />
+                                    </div>
+                                    <h3 className="text-white text-xl font-black mb-3 leading-tight">Preview Unavailable</h3>
+                                    <p className="text-slate-400 text-sm font-medium mb-10 leading-relaxed px-4">
+                                        This file type cannot be previewed directly. You can download it to view locally.
+                                    </p>
+                                    <a
+                                        href={viewerUrl!}
+                                        download={viewerName}
+                                        className="inline-flex items-center space-x-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-indigo-600/30 active:scale-95"
+                                    >
+                                        <DownloadCloud size={20} />
+                                        <span>Download File</span>
+                                    </a>
+                                </motion.div>
+                            )}
+                        </div>
+                    </motion.div>
                 )}
             </AnimatePresence>
         </div>

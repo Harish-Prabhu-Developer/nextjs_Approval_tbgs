@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { approvalRequests, purchaseOrderHdr, dashboardCards, users } from '@/db/schema';
-import { eq, ilike, contains, arrayContains } from 'drizzle-orm';
+import { eq, arrayContains } from 'drizzle-orm';
 import { MOCK_APPROVAL_DATA } from '@/app/config/mockData';
 import { sendPushNotification } from '@/lib/notifications';
 
