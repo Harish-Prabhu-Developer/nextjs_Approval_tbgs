@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { approvalRequests, purchaseOrderHdr } from '@/db/schema';
+import { approvalRequests, purchaseOrderHdr, dashboardCards, users } from '@/db/schema';
+import { eq, ilike, contains, arrayContains } from 'drizzle-orm';
 import { MOCK_APPROVAL_DATA } from '@/app/config/mockData';
+import { sendPushNotification } from '@/lib/notifications';
 
 export async function GET() {
     try {
@@ -62,8 +64,8 @@ export async function POST(request: Request) {
             statusEntry
         } = body;
 
-        // Use timestamp + random to avoid primary key collisions
-        const sno = Date.now() + Math.floor(Math.random() * 1000);
+        // Use timestamp (seconds) + random to avoid primary key collisions and fit in integer range
+        const sno = Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000);
 
         const newRequest = await db.insert(approvalRequests).values({
             sno,
@@ -85,7 +87,44 @@ export async function POST(request: Request) {
             createdDate: new Date(),
         }).returning();
 
-        return NextResponse.json(newRequest[0]);
+        const createdRequest = newRequest[0];
+
+        // Send Push Notifications to relevant approvers
+        void (async () => {
+            try {
+                // 1. Find the card to get the permission required
+                const [card] = await db.select()
+                    .from(dashboardCards)
+                    .where(eq(dashboardCards.approvalType, approvalType));
+
+                if (card) {
+                    const permissionNeeded = card.permissionColumn;
+                    
+                    // 2. Find all users who have this permission
+                    const approvers = await db.select()
+                        .from(users)
+                        .where(arrayContains(users.permissions, [permissionNeeded]));
+
+                    // 3. Send notification to each approver
+                    for (const approver of approvers) {
+                        await sendPushNotification(
+                            approver.id,
+                            `New ${card.cardTitle} Request`,
+                            `Ref: ${poRefNo} has been dispatched by ${requestedBy || 'admin'}.`,
+                            { 
+                                type: 'approval_request', 
+                                sno: createdRequest.sno,
+                                approvalType: approvalType
+                            }
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to send push notifications for approval:", err);
+            }
+        })();
+
+        return NextResponse.json(createdRequest);
     } catch (error) {
         console.error('Error requesting approval:', error);
         return NextResponse.json({ message: 'Error requesting approval' }, { status: 500 });

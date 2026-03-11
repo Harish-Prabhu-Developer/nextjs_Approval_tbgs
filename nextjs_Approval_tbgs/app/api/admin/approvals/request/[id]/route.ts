@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { approvalRequests } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { approvalRequests, dashboardCards, users } from '@/db/schema';
+import { eq, arrayContains } from 'drizzle-orm';
+import { sendPushNotification } from '@/lib/notifications';
 
 export async function PUT(
     request: Request,
@@ -46,7 +47,40 @@ export async function PUT(
             .where(eq(approvalRequests.sno, Number(id)))
             .returning();
 
-        return NextResponse.json(updatedRequest[0]);
+        const updatedDoc = updatedRequest[0];
+
+        // Send Push Notifications for Update
+        void (async () => {
+            try {
+                const [card] = await db.select()
+                    .from(dashboardCards)
+                    .where(eq(dashboardCards.approvalType, approvalType));
+
+                if (card) {
+                    const permissionNeeded = card.permissionColumn;
+                    const approvers = await db.select()
+                        .from(users)
+                        .where(arrayContains(users.permissions, [permissionNeeded]));
+
+                    for (const approver of approvers) {
+                        await sendPushNotification(
+                            approver.id,
+                            `${card.cardTitle} Updated`,
+                            `Ref: ${poRefNo} has been modified by ${requestedBy || 'admin'}.`,
+                            { 
+                                type: 'approval_update', 
+                                sno: updatedDoc.sno,
+                                approvalType: approvalType
+                            }
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to send push notifications for update:", err);
+            }
+        })();
+
+        return NextResponse.json(updatedDoc);
     } catch (error) {
         console.error('Error updating approval request:', error);
         return NextResponse.json({ message: 'Error updating approval request' }, { status: 500 });
@@ -59,7 +93,44 @@ export async function DELETE(
 ) {
     const { id } = await params;
     try {
+        // Fetch details before deleting to send notification
+        const [existingRequest] = await db.select().from(approvalRequests).where(eq(approvalRequests.sno, Number(id)));
+        
         await db.delete(approvalRequests).where(eq(approvalRequests.sno, Number(id)));
+
+        // Send Push Notifications for Delete
+        if (existingRequest) {
+            void (async () => {
+                try {
+                    const [card] = await db.select()
+                        .from(dashboardCards)
+                        .where(eq(dashboardCards.approvalType, existingRequest.approvalType));
+
+                    if (card) {
+                        const permissionNeeded = card.permissionColumn;
+                        const approvers = await db.select()
+                            .from(users)
+                            .where(arrayContains(users.permissions, [permissionNeeded]));
+
+                        for (const approver of approvers) {
+                            await sendPushNotification(
+                                approver.id,
+                                `${card.cardTitle} Removed`,
+                                `Ref: ${existingRequest.poRefNo} has been deleted.`,
+                                { 
+                                    type: 'approval_delete', 
+                                    sno: existingRequest.sno,
+                                    approvalType: existingRequest.approvalType
+                                }
+                            );
+                        }
+                    }
+                } catch (err) {
+                    console.error("Failed to send push notifications for delete:", err);
+                }
+            })();
+        }
+
         return NextResponse.json({ message: 'Approval request deleted' });
     } catch (error) {
         console.error('Error deleting approval request:', error);

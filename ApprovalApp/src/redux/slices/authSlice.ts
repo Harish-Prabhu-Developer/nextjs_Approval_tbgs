@@ -30,6 +30,7 @@ type LoginPayload = {
   username: string;
   password: string;
   rememberMe: boolean;
+  fcmToken?: string | null;
 };
 
 type LoginResponse = {
@@ -71,11 +72,11 @@ export const hydrateAuth = createAsyncThunk(
 
 export const loginUser = createAsyncThunk(
   "auth/login",
-  async ({ username, password, rememberMe }: LoginPayload, { rejectWithValue }) => {
+  async ({ username, password, rememberMe, fcmToken }: LoginPayload, { rejectWithValue }) => {
     try {
       const data = await apiRequest<LoginResponse>("/api/auth/login", {
         method: "POST",
-        body: { username, password },
+        body: { username, password, fcmToken },
       });
 
       await Promise.all([

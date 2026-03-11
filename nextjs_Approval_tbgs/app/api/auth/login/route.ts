@@ -8,7 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 export async function POST(request: Request) {
     try {
-        const { username, password } = await request.json();
+        const { username, password, fcmToken } = await request.json();
 
         // In a real app, you'd verify against DB
         // For now, if DB is empty, we can mock a successful login for 'admin'
@@ -18,6 +18,14 @@ export async function POST(request: Request) {
             const dbUsers = await db.select().from(users).where(eq(users.username, username));
             if (dbUsers.length > 0 && dbUsers[0].password === password) {
                 user = dbUsers[0];
+                
+                // Update FCM token if provided
+                if (fcmToken) {
+                    await db.update(users)
+                        .set({ fcmToken })
+                        .where(eq(users.id, user.id));
+                    user.fcmToken = fcmToken;
+                }
             }
         } catch (e) {
             console.error("DB Login failed, falling back to mock", e);

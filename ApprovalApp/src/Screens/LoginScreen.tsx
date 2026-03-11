@@ -6,6 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useAppDispatch } from '../redux/hooks';
 import { loginUser } from '../redux/slices/authSlice';
 import { REMEMBERED_USERNAME_KEY, REMEMBER_ME_KEY } from '../constants/storage';
+import * as Notifications from 'expo-notifications';
+import { registerForPushNotificationsAsync } from '../utils/notifications';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -22,6 +24,7 @@ export default function LoginScreen() {
         type: 'info',
         message: '',
     });
+    const [pushToken, setPushToken] = useState<string | null>(null);
 
     const toastOpacity = useRef(new Animated.Value(0)).current;
     const toastTranslateY = useRef(new Animated.Value(-16)).current;
@@ -53,6 +56,12 @@ export default function LoginScreen() {
         };
 
         void hydrateRememberState();
+
+        // Fetch push token on mount
+        registerForPushNotificationsAsync().then(token => {
+            if (token) setPushToken(token);
+        });
+
         return () => {
             mounted = false;
         };
@@ -120,6 +129,8 @@ export default function LoginScreen() {
         }, 2200);
     };
 
+
+
     const handleLogin = async () => {
         setError('');
         if (!username.trim() || !password.trim()) {
@@ -135,6 +146,7 @@ export default function LoginScreen() {
                     username: username.trim(),
                     password,
                     rememberMe,
+                    fcmToken: pushToken
                 }),
             ).unwrap();
 
@@ -279,6 +291,7 @@ export default function LoginScreen() {
                                 <Text className="text-base font-bold text-white">Sign In</Text>
                             )}
                         </Pressable>
+
 
                         {!!error && (
                             <View className="rounded-xl border border-red-100 bg-red-50 px-4 py-3">

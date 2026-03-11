@@ -7,6 +7,7 @@ import {
   Clipboard,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -206,6 +207,21 @@ export default function ChatDetailScreen() {
   const [isSending, setIsSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const listRef = useRef<FlatList<ChatRow>>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -749,6 +765,8 @@ export default function ChatDetailScreen() {
 
       <FlatList
         ref={listRef}
+        className="flex-1 w-full"
+        style={{ flex: 1 }}
         data={groupedMessages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id.toString()}
@@ -767,9 +785,8 @@ export default function ChatDetailScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        style={{ paddingBottom: insets.bottom }}
       >
-        <View className="bg-white border-t border-slate-50">
+        <View className="bg-white border-t border-slate-50" style={{ paddingBottom: isKeyboardVisible ? 10 : Math.max(insets.bottom, 10) }}>
           {isUploading && (
             <View className="flex-row items-center justify-center py-2 bg-white border-b border-slate-50">
               <ActivityIndicator size="small" color="#6366f1" />
@@ -839,16 +856,22 @@ export default function ChatDetailScreen() {
               </Pressable>
             </View>
 
-            <View className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 px-4 py-1.5 min-h-[48px] justify-center">
+            <View className="flex-1 bg-slate-50 rounded-3xl border border-slate-200 px-4 min-h-[48px]">
               <TextInput
-                className="text-slate-700 font-medium text-sm"
+                className="text-slate-800 font-medium text-base w-full"
                 placeholder={isUploading ? 'Uploading...' : 'Type a message...'}
-                placeholderTextColor="#cbd5e1"
+                placeholderTextColor="#94a3b8"
                 value={inputValue}
                 onChangeText={handleInputChange}
                 multiline
                 editable={!isUploading}
-                style={{ maxHeight: 100 }}
+                style={{ 
+                  maxHeight: 120, 
+                  minHeight: 48,
+                  paddingTop: Platform.OS === 'ios' ? 14 : 12,
+                  paddingBottom: Platform.OS === 'ios' ? 14 : 12,
+                  textAlignVertical: 'center'
+                }}
               />
             </View>
 

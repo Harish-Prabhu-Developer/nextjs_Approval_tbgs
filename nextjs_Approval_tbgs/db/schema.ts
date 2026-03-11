@@ -26,6 +26,7 @@ export const users = pgTable("tbl_users", {
   email: varchar("email", { length: 128 }).notNull(),
   permissions: text("permissions").array().notNull(), // e.g. ["poApproval", "workOrderApproval"]
   isActive: boolean("is_active").default(true),
+  fcmToken: text("fcm_token"),
   createdAt: timestamp("created_at", { withTimezone: false }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: false }).defaultNow()
 });

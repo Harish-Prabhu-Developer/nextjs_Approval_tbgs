@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { chatMessages } from '@/db/schema';
 import { eq, or, and, asc } from 'drizzle-orm';
+import { users, chatMessages } from '@/db/schema';
+import { sendPushNotification } from '@/lib/notifications';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -48,7 +49,30 @@ export async function POST(request: Request) {
             replyTo
         }).returning();
 
-        return NextResponse.json(newMessage[0]);
+        const createdMessage = newMessage[0];
+
+        // Send Push Notification asynchronoulsy
+        void (async () => {
+            try {
+                const [sender] = await db.select().from(users).where(eq(users.id, senderId));
+                if (sender) {
+                    await sendPushNotification(
+                        receiverId,
+                        `New message from ${sender.name}`,
+                        message || (fileUrl ? 'Sent a file' : 'New message'),
+                        { 
+                            type: 'chat_message', 
+                            messageId: createdMessage.id,
+                            senderId: senderId
+                        }
+                    );
+                }
+            } catch (err) {
+                console.error("Failed to send push notification for chat:", err);
+            }
+        })();
+
+        return NextResponse.json(createdMessage);
     } catch (error) {
         console.error("Error sending message:", error);
         return NextResponse.json({ message: 'Error sending message' }, { status: 500 });

@@ -10,14 +10,46 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { store } from './src/redux/store';
 import { useAppDispatch, useAppSelector } from './src/redux/hooks';
 import { hydrateAuth } from './src/redux/slices/authSlice';
+import * as Notifications from 'expo-notifications';
+import { registerForPushNotificationsAsync } from './src/utils/notifications';
+import { useRef, useState } from 'react';
 
 function AppContent() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, hydrated } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, hydrated, user, token: authToken } = useAppSelector((state) => state.auth);
+  const [expoPushToken, setExpoPushToken] = useState('');
+  const [notification, setNotification] = useState<Notifications.Notification | undefined>(undefined);
+  const notificationListener = useRef<Notifications.Subscription>(undefined);
+  const responseListener = useRef<Notifications.Subscription>(undefined);
 
   useEffect(() => {
-    dispatch(hydrateAuth());
-  }, [dispatch]);
+    dispatch(hydrateAuth(undefined));
+
+    // Register for push notifications
+    if (isAuthenticated) {
+      registerForPushNotificationsAsync().then(token => {
+        if (token) {
+          setExpoPushToken(token);
+          // Here you should ideally call an API to save the token for the user
+          console.log('FCM Token registered:', token);
+        }
+      });
+    }
+
+    // Set up notification listeners
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      setNotification(notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification Response:', response);
+    });
+
+    return () => {
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
+  }, [dispatch, isAuthenticated]);
 
   if (!hydrated) {
     return (

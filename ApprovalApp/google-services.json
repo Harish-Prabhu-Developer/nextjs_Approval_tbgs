@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1025722611950",
+    "project_id": "approvalapp-e8d9c",
+    "storage_bucket": "approvalapp-e8d9c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1025722611950:android:359585fbc1f189cd84dbff",
+        "android_client_info": {
+          "package_name": "com.visioninfotech.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBgjXZFAVV1ITZ2YdL8cHDp_qMx4Smfz9g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
