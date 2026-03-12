@@ -56,13 +56,24 @@ export async function POST(req: Request) {
         });
 
         const fileUrl = `/uploads/${fileName}`;
+        const contentType = fileObj.type || 'application/octet-stream';
+        
+        // For serverless deployments (like Netlify/Vercel), local filesystem writes aren't persistent.
+        // We provide a base64 version for images so they work everywhere.
+        let base64Data = null;
+        if (contentType.startsWith('image/')) {
+            base64Data = `data:${contentType};base64,${buffer.toString('base64')}`;
+            console.log(">>> [UPLOAD] Image detected, generated base64 (length:", base64Data.length, ")");
+        }
+
         console.log(">>> [UPLOAD] Success! URL:", fileUrl);
 
         return NextResponse.json({
-            fileUrl,
+            fileUrl: base64Data || fileUrl, // Use base64 for images as fallback
             fileName: originalName,
-            fileType: fileObj.type,
-            fileSize: fileObj.size
+            fileType: contentType,
+            fileSize: fileObj.size,
+            internalPath: fileUrl
         });
     } catch (error: any) {
         console.error(">>> [UPLOAD] FATAL ERROR:", error);

@@ -56,13 +56,23 @@ const apiBaseUrl = (process.env.EXPO_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
 
 export const normalizeFileUrl = (fileUrl?: string | null) => {
   if (!fileUrl) return null;
-  if (/^(https?:\/\/|file:\/\/|content:\/\/)/i.test(fileUrl)) {
-    return fileUrl;
+  
+  const url = String(fileUrl).trim();
+
+  // If it's already an absolute URL (http, https, file, content) or a Data URL (base64)
+  if (/^(https?:\/\/|file:\/\/|content:\/\/|data:)/i.test(url)) {
+    // For normal HTTPS URLs from our own storage, we don't need to do anything
+    return url;
   }
+  
   if (!apiBaseUrl) {
-    return fileUrl;
+    console.warn("normalizeFileUrl: EXPO_PUBLIC_BASE_URL is not set");
+    return url;
   }
-  return `${apiBaseUrl}${fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`}`;
+
+  // Ensure path starts with single slash
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  return `${apiBaseUrl}${cleanPath}`;
 };
 
 export const normalizeReplyTo = (replyTo?: ReplyTo | null): ReplyTo | null => {

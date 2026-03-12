@@ -590,9 +590,9 @@ export default function ChatDetailScreen() {
     const isSelected = selectedMessageIds.includes(Number(item.id));
     const displayUrl = item.imageUrl || item.fileUrl;
     const isImage = (item.fileType && item.fileType.startsWith('image/')) || 
-                    (displayUrl && /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(displayUrl));
+                    (displayUrl && (displayUrl.startsWith('data:image/') || /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(displayUrl)));
     const isPdf = (item.fileType && (item.fileType === 'application/pdf' || item.fileType.includes('pdf'))) || 
-                  (displayUrl && /\.pdf(?:\?|$)/i.test(displayUrl));
+                  (displayUrl && (displayUrl.startsWith('data:application/pdf') || /\.pdf(?:\?|$)/i.test(displayUrl)));
     const replyOwner = (item.replyTo && !!currentUser && Number(item.replyTo.senderId) === Number(currentUser.id)) ? 'You' : name;
 
     return (
@@ -646,6 +646,11 @@ export default function ChatDetailScreen() {
                 source={{ uri: displayUrl }} 
                 style={{ width: 220, height: 180, borderRadius: 12, backgroundColor: '#f1f5f9' }} 
                 resizeMode="cover"
+                onLoadStart={() => console.log(`[IMAGE] Loading: ${displayUrl}`)}
+                onLoad={() => console.log(`[IMAGE] Success: ${displayUrl}`)}
+                onError={(e) => {
+                  console.error(`[IMAGE] Error loading ${displayUrl}:`, e.nativeEvent.error);
+                }}
               />
             </TouchableOpacity>
           )}
@@ -909,7 +914,10 @@ export default function ChatDetailScreen() {
                 value={inputValue}
                 onChangeText={handleInputChange}
                 onBlur={() => setIsFocused(false)}
-                onFocus={() => setIsFocused(true)}
+                onFocus={() => {
+                  setIsFocused(true);
+                  if (showEmojiPicker) setShowEmojiPicker(false);
+                }}
                 multiline
                 editable={!isUploading}
                 style={{ 
