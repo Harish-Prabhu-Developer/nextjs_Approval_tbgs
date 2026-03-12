@@ -563,9 +563,11 @@ export default function ChatDetailScreen() {
   const openViewer = (url: string, type?: string | null) => {
     setViewerUrl(url);
     const mimeType = type || '';
-    if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(url)) {
+    const isBase64Image = url.startsWith('data:image/');
+    const isBase64PDF = url.startsWith('data:application/pdf');
+    if (mimeType.startsWith('image/') || isBase64Image || /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(url)) {
       setViewerType('image');
-    } else if (url.toLowerCase().endsWith('.pdf') || mimeType === 'application/pdf' || mimeType.includes('pdf')) {
+    } else if (isBase64PDF || url.toLowerCase().endsWith('.pdf') || mimeType === 'application/pdf' || mimeType.includes('pdf')) {
       setViewerType('pdf');
     } else {
       setViewerType('other');

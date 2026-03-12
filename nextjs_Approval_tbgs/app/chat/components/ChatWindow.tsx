@@ -383,9 +383,11 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
     const openViewer = (url: string, type: string | undefined, fileName: string | undefined) => {
         setViewerUrl(url);
         setViewerName(fileName || 'File Preview');
-        if (type?.startsWith('image/')) {
+        const isBase64Image = url.startsWith('data:image/');
+        const isBase64PDF = url.startsWith('data:application/pdf');
+        if (type?.startsWith('image/') || isBase64Image) {
             setViewerType('image');
-        } else if (url.toLowerCase().endsWith('.pdf') || type === 'application/pdf') {
+        } else if (isBase64PDF || url.toLowerCase().endsWith('.pdf') || type === 'application/pdf' || type?.includes('pdf')) {
             setViewerType('pdf');
         } else {
             setViewerType('other');
@@ -633,7 +635,10 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
 
                             const isOwn = Number(item.senderId) === Number(currentUser.id);
                             const showTail = item.isFirstInGroup;
-                            const isImage = item.fileType?.startsWith('image/');
+                            const isImage = item.fileType?.startsWith('image/') ||
+                                (item.fileUrl && (item.fileUrl.startsWith('data:image/') || /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(item.fileUrl)));
+                            const isPdf = item.fileType === 'application/pdf' || item.fileType?.includes('pdf') ||
+                                (item.fileUrl && (item.fileUrl.startsWith('data:application/pdf') || /\.pdf(?:\?|$)/i.test(item.fileUrl)));
                             const replyOwner = Number(item.replyTo?.senderId) === Number(currentUser.id) ? 'You' : recipient?.name;
 
                             return (
@@ -745,11 +750,11 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                                             }`}
                                                     >
                                                         <div className={`p-2 rounded-lg ${isOwn ? 'bg-white/20' : 'bg-indigo-100'}`}>
-                                                            {item.fileName?.endsWith('.pdf') ? <FileText size={24} className={isOwn ? 'text-white' : 'text-indigo-600'} /> : <File size={24} className={isOwn ? 'text-white' : 'text-indigo-600'} />}
+                                                            {isPdf ? <FileText size={24} className={isOwn ? 'text-white' : 'text-indigo-600'} /> : <File size={24} className={isOwn ? 'text-white' : 'text-indigo-600'} />}
                                                         </div>
                                                         <div className="flex-1 min-w-0 pr-4">
-                                                            <p className={`text-xs font-bold truncate ${isOwn ? 'text-white' : 'text-slate-800'}`}>{item.fileName}</p>
-                                                            <p className={`text-[10px] ${isOwn ? 'text-white/60' : 'text-slate-400'}`}>Document</p>
+                                                            <p className={`text-xs font-bold truncate ${isOwn ? 'text-white' : 'text-slate-800'}`}>{item.fileName || 'Attachment'}</p>
+                                                            <p className={`text-[10px] ${isOwn ? 'text-white/60' : 'text-slate-400'}`}>{isPdf ? 'PDF Document' : 'File'}</p>
                                                         </div>
                                                         <Download size={18} className={isOwn ? 'text-white/60' : 'text-slate-300'} />
                                                     </div>
@@ -1018,14 +1023,28 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <a
-                                    href={viewerUrl!}
-                                    download={viewerName}
+                                <button
+                                    onClick={() => {
+                                        if (!viewerUrl) return;
+                                        // Handle both base64 data URLs and regular URLs
+                                        if (viewerUrl.startsWith('data:')) {
+                                            const link = document.createElement('a');
+                                            link.href = viewerUrl;
+                                            link.download = viewerName || 'download';
+                                            link.click();
+                                        } else {
+                                            const link = document.createElement('a');
+                                            link.href = viewerUrl;
+                                            link.download = viewerName || 'download';
+                                            link.target = '_blank';
+                                            link.click();
+                                        }
+                                    }}
                                     className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-500/20"
                                 >
                                     <DownloadCloud size={18} strokeWidth={2.5} />
                                     <span className="text-xs font-black uppercase tracking-widest hidden sm:inline">Download</span>
-                                </a>
+                                </button>
                             </div>
                         </div>
 
@@ -1063,14 +1082,20 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
                                     <p className="text-slate-400 text-sm font-medium mb-10 leading-relaxed px-4">
                                         This file type cannot be previewed directly. You can download it to view locally.
                                     </p>
-                                    <a
-                                        href={viewerUrl!}
-                                        download={viewerName}
+                                    <button
+                                        onClick={() => {
+                                            if (!viewerUrl) return;
+                                            const link = document.createElement('a');
+                                            link.href = viewerUrl;
+                                            link.download = viewerName || 'download';
+                                            if (!viewerUrl.startsWith('data:')) link.target = '_blank';
+                                            link.click();
+                                        }}
                                         className="inline-flex items-center space-x-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-indigo-600/30 active:scale-95"
                                     >
                                         <DownloadCloud size={20} />
                                         <span>Download File</span>
-                                    </a>
+                                    </button>
                                 </motion.div>
                             )}
                         </div>
