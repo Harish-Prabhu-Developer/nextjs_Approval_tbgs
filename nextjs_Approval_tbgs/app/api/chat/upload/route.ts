@@ -42,29 +42,35 @@ export async function POST(req: Request) {
         console.log(">>> [UPLOAD] Targeted directory:", uploadDir);
         
         // Ensure directory exists
-        if (!fs.existsSync(uploadDir)) {
-            console.log(">>> [UPLOAD] Creating directory...");
-            await mkdir(uploadDir, { recursive: true });
+        try {
+            if (!fs.existsSync(uploadDir)) {
+                console.log(">>> [UPLOAD] Creating directory...");
+                await mkdir(uploadDir, { recursive: true });
+            }
+        } catch (err: any) {
+            console.warn(`>>> [UPLOAD] Skip mkdir (expected in serverless): ${err.message}`);
         }
         
         const uploadPath = join(uploadDir, fileName);
         console.log(">>> [UPLOAD] Writing to path:", uploadPath);
         
-        await writeFile(uploadPath, buffer).catch(err => {
-            console.error(">>> [UPLOAD] Error writing file:", err);
-            throw new Error(`FileSystem write failed: ${err.message}`);
-        });
+        // In serverless environments (Netlify/Vercel), the filesystem is read-only (EROFS).
+        // We wrap this in a try-catch so it doesn't crash the entire request.
+        let localWriteSuccess = false;
+        try {
+            await writeFile(uploadPath, buffer);
+            localWriteSuccess = true;
+        } catch (err: any) {
+            console.warn(`>>> [UPLOAD] FileSystem write skipped/failed (expected in serverless): ${err.message}`);
+        }
 
         const fileUrl = `/uploads/${fileName}`;
         const contentType = fileObj.type || 'application/octet-stream';
         
-        // For serverless deployments (like Netlify/Vercel), local filesystem writes aren't persistent.
-        // We provide a base64 version for images so they work everywhere.
-        let base64Data = null;
-        if (contentType.startsWith('image/')) {
-            base64Data = `data:${contentType};base64,${buffer.toString('base64')}`;
-            console.log(">>> [UPLOAD] Image detected, generated base64 (length:", base64Data.length, ")");
-        }
+        // For serverless deployments, we provide a base64 version so files work everywhere.
+        // Convert to base64 string
+        const base64Data = `data:${contentType};base64,${buffer.toString('base64')}`;
+        console.log(`>>> [UPLOAD] Generated Base64 data (length: ${base64Data.length})`);
 
         console.log(">>> [UPLOAD] Success! URL:", fileUrl);
 
