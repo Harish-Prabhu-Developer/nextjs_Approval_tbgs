@@ -1,36 +1,75 @@
 import { NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
 
 export async function POST(req: Request) {
+    console.log(">>> [UPLOAD] Request started");
     try {
-        const formData = await req.formData();
-        const file = formData.get('file') as File;
+        const formData = await req.formData().catch(err => {
+            console.error(">>> [UPLOAD] Error parsing formData:", err);
+            throw new Error(`FormData parsing failed: ${err.message}`);
+        });
+        
+        const file = formData.get('file');
+        console.log(">>> [UPLOAD] Received field 'file':", file ? "Yes" : "No");
 
-        if (!file) {
-            return NextResponse.json({ message: 'No file uploaded' }, { status: 400 });
+        if (!file || typeof file === 'string') {
+            console.error(">>> [UPLOAD] Invalid file field");
+            return NextResponse.json({ message: 'No file uploaded or invalid file format' }, { status: 400 });
         }
 
-        const bytes = await file.arrayBuffer();
+        const fileObj = file as any;
+        console.log(">>> [UPLOAD] File details:", {
+            name: fileObj.name,
+            type: fileObj.type,
+            size: fileObj.size
+        });
+
+        const bytes = await fileObj.arrayBuffer().catch((err: any) => {
+            console.error(">>> [UPLOAD] Error reading arrayBuffer:", err);
+            throw new Error(`ArrayBuffer conversion failed: ${err.message}`);
+        });
         const buffer = Buffer.from(bytes);
+        console.log(">>> [UPLOAD] Buffer created, size:", buffer.length);
 
-        const fileExtension = file.name.split('.').pop();
+        const originalName = fileObj.name || 'unknown_file';
+        const fileExtension = originalName.split('.').pop();
         const fileName = `${uuidv4()}.${fileExtension}`;
-        const uploadPath = join(process.cwd(), 'public', 'uploads', fileName);
-
-        await writeFile(uploadPath, buffer);
+        
+        const uploadDir = join(process.cwd(), 'public', 'uploads');
+        console.log(">>> [UPLOAD] Targeted directory:", uploadDir);
+        
+        // Ensure directory exists
+        if (!fs.existsSync(uploadDir)) {
+            console.log(">>> [UPLOAD] Creating directory...");
+            await mkdir(uploadDir, { recursive: true });
+        }
+        
+        const uploadPath = join(uploadDir, fileName);
+        console.log(">>> [UPLOAD] Writing to path:", uploadPath);
+        
+        await writeFile(uploadPath, buffer).catch(err => {
+            console.error(">>> [UPLOAD] Error writing file:", err);
+            throw new Error(`FileSystem write failed: ${err.message}`);
+        });
 
         const fileUrl = `/uploads/${fileName}`;
+        console.log(">>> [UPLOAD] Success! URL:", fileUrl);
 
         return NextResponse.json({
             fileUrl,
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size
+            fileName: originalName,
+            fileType: fileObj.type,
+            fileSize: fileObj.size
         });
-    } catch (error) {
-        console.error("Error uploading file:", error);
-        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    } catch (error: any) {
+        console.error(">>> [UPLOAD] FATAL ERROR:", error);
+        return NextResponse.json({ 
+            message: error.message || 'Internal Server Error',
+            details: error.toString(),
+            stack: error.stack
+        }, { status: 500 });
     }
 }

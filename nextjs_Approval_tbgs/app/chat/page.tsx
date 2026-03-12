@@ -128,6 +128,12 @@ export default function ChatPage() {
             if (selectedUserRef.current !== null) markAsRead(selectedUserRef.current);
         };
         window.addEventListener('focus', handleFocus);
+        
+        // Request Notification Permissions
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+
         return () => window.removeEventListener('focus', handleFocus);
     }, [markAsRead]);
 
@@ -151,27 +157,31 @@ export default function ChatPage() {
             const dataSId = Number(data.senderId);
             const dataRId = Number(data.receiverId);
 
-            setUsers(prev => prev.map(u => {
-                const isRelevantUser = (u.id === dataSId || u.id === dataRId) && u.id !== myId;
-                if (!isRelevantUser) return u;
+            setUsers(prev => {
+                const updatedUsers = prev.map(u => {
+                    const isRelevantUser = (u.id === dataSId || u.id === dataRId) && u.id !== myId;
+                    if (!isRelevantUser) return u;
 
-                const isCurrentlyChatting = u.id === activeId;
-                const isIncomingMessage = dataSId === u.id;
+                    const isCurrentlyChatting = u.id === activeId;
+                    const isIncomingMessage = dataSId === u.id;
 
-                return {
-                    ...u,
-                    lastMessage: data.message,
-                    lastMessageTime: data.createdAt,
-                    lastFileUrl: data.fileUrl,
-                    lastFileType: data.fileType,
-                    isTyping: isIncomingMessage ? false : u.isTyping, // Instant clear
-                    unreadCount: (isIncomingMessage && !isCurrentlyChatting)
-                        ? (u.unreadCount || 0) + 1
-                        : 0
-                };
-            }));
+                    return {
+                        ...u,
+                        lastMessage: data.message,
+                        lastMessageTime: data.createdAt,
+                        lastFileUrl: data.fileUrl,
+                        lastFileType: data.fileType,
+                        isTyping: isIncomingMessage ? false : u.isTyping,
+                        unreadCount: (isIncomingMessage && !isCurrentlyChatting)
+                            ? (u.unreadCount || 0) + 1
+                            : 0
+                    };
+                });
+                return updatedUsers;
+            });
 
             const isForThisChat = (dataRId === myId && dataSId === activeId) || (dataSId === myId && dataRId === activeId);
+
             if (isForThisChat) {
                 setMessages(prev => {
                     const msgId = Number(data.id);

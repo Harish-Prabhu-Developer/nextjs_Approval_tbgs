@@ -45,6 +45,7 @@ export interface CreateChatMessagePayload {
   senderId: number;
   receiverId: number;
   message: string;
+  imageUrl?: string | null;
   fileUrl?: string | null;
   fileName?: string | null;
   fileType?: string | null;
@@ -74,6 +75,7 @@ export const normalizeReplyTo = (replyTo?: ReplyTo | null): ReplyTo | null => {
 
 export const normalizeMessage = (message: Message): Message => ({
   ...message,
+  imageUrl: normalizeFileUrl(message.imageUrl),
   fileUrl: normalizeFileUrl(message.fileUrl),
   replyTo: normalizeReplyTo(message.replyTo),
 });

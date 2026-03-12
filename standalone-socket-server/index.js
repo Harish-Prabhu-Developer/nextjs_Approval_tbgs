@@ -38,6 +38,22 @@ const allowedOrigins = [
     ...(process.env.ALLOWED_ORIGINS?.split(',') || [])
 ];
 
+app.use(express.json());
+
+// API route to trigger events from the main backend
+app.post('/emit', (req, res) => {
+    const { event, data, room } = req.body;
+    console.log(`[Socket API] Emitting ${event} to ${room || 'global'}`);
+    
+    if (room) {
+        io.to(room).emit(event, data);
+    } else {
+        io.emit(event, data);
+    }
+    
+    res.json({ success: true });
+});
+
 // Socket.IO Server Configuration with optimized stability
 const io = new Server(server, {
     // Connection settings

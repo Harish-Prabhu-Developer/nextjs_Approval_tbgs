@@ -53,30 +53,43 @@ export async function fileUpload<T>(path: string, formData: FormData, token?: st
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = `${baseUrl}${normalizedPath}`;
 
-  const headers: Record<string, string> = {
-    // Note: Do NOT set Content-Type for FormData, the browser/native fetch will set it correctly with Boundary
-  };
-
+  console.log(`>>> [CLIENT] Uploading to: ${url}`);
+  
+  const headers: Record<string, string> = {};
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
 
-  const raw = await response.text();
-  const payload = raw ? JSON.parse(raw) : null;
+    const raw = await response.text();
+    console.log(`>>> [CLIENT] Server response (${response.status}):`, raw);
+    
+    let payload;
+    try {
+      payload = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      console.error(">>> [CLIENT] Failed to parse response as JSON");
+      throw new Error(`Server returned non-JSON response: ${raw.slice(0, 100)}`);
+    }
 
-  if (!response.ok) {
-    const message =
-      payload?.message ||
-      payload?.error ||
-      `Upload failed (${response.status})`;
-    throw new Error(message);
+    if (!response.ok) {
+      const message = payload?.message || payload?.details || payload?.error || `Upload failed (${response.status})`;
+      throw new Error(message);
+    }
+
+    return payload as T;
+  } catch (error: any) {
+    console.error(">>> [CLIENT] Network Error:", error);
+    // Specifically catch network request failed which usually means unreachable or DNS
+    if (error.message === 'Network request failed') {
+      throw new Error(`Cannot reach server at ${baseUrl}. Please check your connection and server URL.`);
+    }
+    throw error;
   }
-
-  return payload as T;
 }

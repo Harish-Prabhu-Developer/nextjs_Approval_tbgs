@@ -123,7 +123,7 @@ const TypingIndicator = () => {
 
 const MobileExpandableText = ({
   text,
-  limit = 200,
+  limit = 400,
   isOwn,
   highlight = ""
 }: {
@@ -141,7 +141,6 @@ const MobileExpandableText = ({
 
   const renderFormattedText = (content: string) => {
     const escapedHighlight = highlight.trim() ? highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-    // Match **bold**, *bold*, \n, and highlight
     const regex = new RegExp(`(\\*\\*.*?\\*\\*|\\*.*?\\*|\\n${escapedHighlight ? `|${escapedHighlight}` : ""})`, "gi");
     const parts = content.split(regex);
 
@@ -149,19 +148,14 @@ const MobileExpandableText = ({
       if (!part) return null;
       if (part === '\n') return <Text key={index}>{'\n'}</Text>;
 
-      // WhatsApp style *bold* or markdown **bold**
       if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('*') && part.endsWith('*'))) {
         const isDouble = part.startsWith('**');
         const content = isDouble ? part.slice(2, -2) : part.slice(1, -1);
-        return (
-          <Text key={index} style={{ fontWeight: 'bold' }}>{content}</Text>
-        );
+        return <Text key={index} style={{ fontWeight: 'bold' }}>{content}</Text>;
       }
 
       if (escapedHighlight && part.toLowerCase() === highlight.toLowerCase()) {
-        return (
-          <Text key={index} style={{ backgroundColor: '#fef08a', color: '#0f172a' }}>{part}</Text>
-        );
+        return <Text key={index} style={{ backgroundColor: '#fef08a', color: '#0f172a' }}>{part}</Text>;
       }
 
       return <Text key={index}>{part}</Text>;
@@ -210,6 +204,7 @@ export default function ChatDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Viewer State
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -464,12 +459,14 @@ export default function ChatDetailScreen() {
       ? { ...replyingTo }
       : null;
     const tempId = Date.now();
+    const isMsgImage = pendingFile?.type.startsWith('image/');
     const optimisticMessage: Message = {
       id: tempId,
       senderId: Number(currentUser?.id),
       receiverId: recipientId,
       message: inputValue.trim(),
       fileUrl: pendingFile?.uri,
+      imageUrl: isMsgImage ? pendingFile?.uri : null,
       fileName: pendingFile?.name,
       fileType: pendingFile?.type,
       createdAt: new Date().toISOString(),
@@ -499,12 +496,14 @@ export default function ChatDetailScreen() {
         uploaded = await fileUpload('/api/chat/upload', formData, token);
       }
 
+      const isCurrentlyImage = fileToUpload?.type.startsWith('image/');
       const persistedMessage = await createChatMessageApi(
         {
           senderId: Number(currentUser?.id),
           receiverId: recipientId,
           message: optimisticMessage.message,
           fileUrl: uploaded.fileUrl,
+          imageUrl: isCurrentlyImage ? uploaded.fileUrl : null,
           fileName: uploaded.fileName,
           fileType: uploaded.fileType,
           replyTo,
@@ -520,13 +519,16 @@ export default function ChatDetailScreen() {
         socket.emit('send-message', persistedMessage);
       }
     } catch (error: any) {
+      console.error('Upload/Send error:', error);
+      Alert.alert('Error', 'Failed to send message/file. Please try again.');
       setMessages((currentMessages) =>
         currentMessages.filter((message) => Number(message.id) !== tempId)
       );
-      Alert.alert('Error', error.message || 'Failed to send message');
     } finally {
       setIsSending(false);
       setIsUploading(false);
+      // Ensure scroll to bottom after sending, regardless of success or failure
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };
 
@@ -558,11 +560,12 @@ export default function ChatDetailScreen() {
     setSelectedMessageIds([]);
   };
 
-  const openViewer = (url: string, type: string) => {
+  const openViewer = (url: string, type?: string | null) => {
     setViewerUrl(url);
-    if (type.startsWith('image/')) {
+    const mimeType = type || '';
+    if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(url)) {
       setViewerType('image');
-    } else if (url.toLowerCase().endsWith('.pdf') || type === 'application/pdf') {
+    } else if (url.toLowerCase().endsWith('.pdf') || mimeType === 'application/pdf' || mimeType.includes('pdf')) {
       setViewerType('pdf');
     } else {
       setViewerType('other');
@@ -585,7 +588,11 @@ export default function ChatDetailScreen() {
 
     const isOwn = !!currentUser && Number(item.senderId) === Number(currentUser.id);
     const isSelected = selectedMessageIds.includes(Number(item.id));
-    const isImage = item.fileType?.startsWith('image/');
+    const displayUrl = item.imageUrl || item.fileUrl;
+    const isImage = (item.fileType && item.fileType.startsWith('image/')) || 
+                    (displayUrl && /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(displayUrl));
+    const isPdf = (item.fileType && (item.fileType === 'application/pdf' || item.fileType.includes('pdf'))) || 
+                  (displayUrl && /\.pdf(?:\?|$)/i.test(displayUrl));
     const replyOwner = (item.replyTo && !!currentUser && Number(item.replyTo.senderId) === Number(currentUser.id)) ? 'You' : name;
 
     return (
@@ -633,29 +640,36 @@ export default function ChatDetailScreen() {
             </Pressable>
           )}
 
-          {item.fileUrl && isImage && (
-            <TouchableOpacity onPress={() => openViewer(item.fileUrl!, item.fileType!)}>
-              <Image source={{ uri: item.fileUrl }} style={{ width: 220, height: 180, borderRadius: 12 }} />
+          {displayUrl && isImage && (
+            <TouchableOpacity onPress={() => openViewer(displayUrl!, item.fileType!)}>
+              <Image 
+                source={{ uri: displayUrl }} 
+                style={{ width: 220, height: 180, borderRadius: 12, backgroundColor: '#f1f5f9' }} 
+                resizeMode="cover"
+              />
             </TouchableOpacity>
           )}
 
-          {item.fileUrl && !isImage && (
+          {displayUrl && !isImage && (
             <TouchableOpacity
-              onPress={() => openViewer(item.fileUrl!, item.fileType!)}
+              onPress={() => openViewer(displayUrl!, item.fileType!)}
               className={`flex-row items-center p-3 rounded-xl border ${isOwn ? 'bg-white/10 border-white/20' : 'bg-slate-50 border-slate-100'}`}
+              style={{ minWidth: 200 }}
             >
               <View className={`p-2 rounded-lg mr-2 ${isOwn ? 'bg-white/20' : 'bg-indigo-100'}`}>
-                {item.fileName?.toLowerCase().endsWith('.pdf') ? (
+                {isPdf ? (
                   <FileText size={24} color={isOwn ? 'white' : '#6366f1'} />
                 ) : (
                   <File size={24} color={isOwn ? 'white' : '#6366f1'} />
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text className={`text-xs font-bold ${isOwn ? 'text-white' : 'text-slate-800'}`} numberOfLines={2}>
+                <Text style={{ color: isOwn ? 'white' : '#1e293b' }} className="text-xs font-bold" numberOfLines={2}>
                   {item.fileName || 'Attachment'}
                 </Text>
-                <Text className={`text-[10px] ${isOwn ? 'text-white/60' : 'text-slate-400'}`}>Document</Text>
+                <Text style={{ color: isOwn ? 'rgba(255,255,255,0.7)' : '#64748b' }} className="text-[10px]">
+                  {isPdf ? 'PDF Document' : 'File'}
+                </Text>
               </View>
               <Download size={18} color={isOwn ? 'rgba(255,255,255,0.6)' : '#94a3b8'} />
             </TouchableOpacity>
@@ -691,7 +705,7 @@ export default function ChatDetailScreen() {
                 fileName: item.fileName,
               })
             }
-            className={`mt-1 p-1 rounded-full bg-white border border-slate-100 ${isOwn ? 'mr-2' : 'ml-2'}`}
+            className={`mt-1 p-1 rounded-full bg-white border border-slate-100 shadow-sm ${isOwn ? 'mr-2' : 'ml-2'}`}
           >
             <CornerUpLeft size={13} color="#6366f1" />
           </Pressable>
@@ -704,7 +718,7 @@ export default function ChatDetailScreen() {
 
   return (
     <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-      <View className="flex-row items-center justify-between px-2 py-3 border-b border-slate-50 bg-white">
+      <View className="flex-row items-center justify-between px-2 py-3 border-b border-slate-50 bg-white shadow-sm z-10">
         {selectedMessageIds.length > 0 ? (
           <View className="flex-1 flex-row items-center justify-between px-2">
             <View className="flex-row items-center">
@@ -802,14 +816,14 @@ export default function ChatDetailScreen() {
       />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View className="bg-white border-t border-slate-50" style={{ paddingBottom: isKeyboardVisible ? 10 : Math.max(insets.bottom, 10) }}>
+        <View className="bg-white border-t border-slate-50" style={{ paddingBottom: isKeyboardVisible ? 5 : Math.max(insets.bottom, 10) }}>
           {isUploading && (
             <View className="flex-row items-center justify-center py-2 bg-white border-b border-slate-50">
               <ActivityIndicator size="small" color="#6366f1" />
-              <Text className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-2">Uploading File...</Text>
+              <Text className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-2">Uploading...</Text>
             </View>
           )}
 
@@ -824,9 +838,7 @@ export default function ChatDetailScreen() {
               )}
               <View className="flex-1">
                 <Text className="text-xs font-bold text-indigo-700" numberOfLines={1}>{pendingFile.name}</Text>
-                <Text className="text-[10px] text-indigo-400 uppercase font-black tracking-widest mt-0.5">
-                  {pendingFile.type.startsWith('image/') ? 'Image' : 'File'} ready to send
-                </Text>
+                <Text className="text-[10px] text-indigo-400 uppercase font-black mt-0.5">Ready to send</Text>
               </View>
               <Pressable onPress={() => setPendingFile(null)} className="p-1 ml-1">
                 <X size={16} color="#6366f1" />
@@ -837,7 +849,7 @@ export default function ChatDetailScreen() {
           {replyingTo && (
             <View className="bg-slate-50 mx-3 mt-2 mb-1 p-3 rounded-2xl border-l-4 border-indigo-500 flex-row justify-between">
               <View className="flex-1">
-                <Text className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">
+                <Text className="text-[10px] font-black text-indigo-600 uppercase mb-1">
                   Replying to {Number(replyingTo.senderId) === Number(currentUser?.id) ? 'Yourself' : name}
                 </Text>
                 <Text className="text-xs text-slate-500 font-medium" numberOfLines={1}>
@@ -852,27 +864,41 @@ export default function ChatDetailScreen() {
 
           <View className="flex-row items-end px-3 py-3">
             <View className="flex-row items-center bg-slate-50 p-1 rounded-xl border border-slate-100 mr-2">
-              <Pressable onPress={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 rounded-lg">
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setShowEmojiPicker(!showEmojiPicker);
+                }}
+                className="p-2 rounded-lg"
+              >
                 <Smile size={20} color={showEmojiPicker ? '#6366f1' : '#64748b'} />
-              </Pressable>
-              <Pressable onPress={async () => {
-                const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
-                if (!result.canceled) {
-                  const asset = result.assets[0];
-                  setPendingFile({ uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' });
-                }
-              }} disabled={isUploading} className="p-2 rounded-lg">
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+                  if (!result.canceled) {
+                    const asset = result.assets[0];
+                    setPendingFile({ uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' });
+                  }
+                }}
+                disabled={isUploading}
+                className="p-2 rounded-lg"
+              >
                 <Paperclip size={20} color={isUploading ? '#cbd5e1' : '#64748b'} />
-              </Pressable>
-              <Pressable onPress={async () => {
-                const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
-                if (!result.canceled) {
-                  const asset = result.assets[0];
-                  setPendingFile({ uri: asset.uri, name: asset.fileName || `photo_${Date.now()}.jpg`, type: asset.mimeType || 'image/jpeg' });
-                }
-              }} disabled={isUploading} className="p-2 rounded-lg">
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
+                  if (!result.canceled) {
+                    const asset = result.assets[0];
+                    setPendingFile({ uri: asset.uri, name: asset.fileName || `photo_${Date.now()}.jpg`, type: asset.mimeType || 'image/jpeg' });
+                  }
+                }}
+                disabled={isUploading}
+                className="p-2 rounded-lg"
+              >
                 <ImageIcon size={20} color={isUploading ? '#cbd5e1' : '#64748b'} />
-              </Pressable>
+              </TouchableOpacity>
             </View>
 
             <View className="flex-1 bg-slate-50 rounded-3xl border border-slate-200 px-4 min-h-[48px]">
@@ -882,6 +908,8 @@ export default function ChatDetailScreen() {
                 placeholderTextColor="#94a3b8"
                 value={inputValue}
                 onChangeText={handleInputChange}
+                onBlur={() => setIsFocused(false)}
+                onFocus={() => setIsFocused(true)}
                 multiline
                 editable={!isUploading}
                 style={{ 

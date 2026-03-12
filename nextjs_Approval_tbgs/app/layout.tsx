@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Premium Business Intelligence Dashboard",
 };
 
+import RootNotifications from "./components/GlobalNotifications";
+
 export default function RootLayout({
   children,
 }: {
@@ -22,6 +24,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased font-['Poppins',sans-serif]">
         <StoreProvider>
+          <RootNotifications />
           {children}
           <Toaster position="top-center" />
         </StoreProvider>

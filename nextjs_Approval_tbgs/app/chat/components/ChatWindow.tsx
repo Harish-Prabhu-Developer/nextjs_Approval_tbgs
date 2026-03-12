@@ -71,7 +71,7 @@ export default function ChatWindow({ recipient, currentUser, messages, onSendMes
     const [messageMenuData, setMessageMenuData] = useState<{ message: Message, x: number, y: number } | null>(null);
     const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
     const [showStatusAlt, setShowStatusAlt] = useState(false);
-    
+
     // Viewer State
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerUrl, setViewerUrl] = useState<string | null>(null);
