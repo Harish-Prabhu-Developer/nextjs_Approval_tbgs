@@ -116,13 +116,13 @@ export default function Template({ children }: { children: React.ReactNode }) {
             icon: card.iconKey,
             path: `/${card.routeSlug}`,
             permissionColumn: card.permissionColumn
-        })).filter((item: MenuItem) => 
-            user.role?.toLowerCase() === 'admin' || 
+        })).filter((item: MenuItem) =>
+            user.role?.toLowerCase() === 'admin' ||
             user.permissions?.includes(item.permissionColumn || '')
         );
 
         let updatedMenu = [...STATIC_MENU_ITEMS.map(item => ({ ...item, pendingCount: getPendingCount(item.permissionColumn, item.path) }))];
-        
+
         updatedMenu = [...updatedMenu, ...dynamicItems];
 
         if (user.role?.toLowerCase() === 'admin') {
@@ -196,12 +196,12 @@ export default function Template({ children }: { children: React.ReactNode }) {
                 {/* Sidebar Header */}
                 <div className="flex items-center justify-between p-4 border-b border-white/10 h-16 shrink-0">
                     <div className={`flex items-center space-x-3 ${!isExpanded && 'justify-center w-full'}`}>
-                        <div className="w-9 h-9 shrink-0 rounded-lg bg-linear-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-md">
-                            <span className="font-bold text-base text-white">{username.charAt(0)}</span>
+                        <div className="w-9 h-9 shrink-0 rounded-lg overflow-hidden flex items-center justify-center shadow-md bg-white">
+                            <img src="/tbgs-logo.jpg" alt="TBGS Logo" className="w-full h-full object-contain" />
                         </div>
                         {isExpanded && (
                             <div className="min-w-0">
-                                <h1 className="text-lg font-bold text-white truncate tracking-tight">VIT Hub</h1>
+                                <h1 className="text-lg font-bold text-white truncate tracking-tight">TBGS Hub</h1>
                                 <p className="text-[10px] text-indigo-200 font-bold uppercase opacity-70">Control Panel</p>
                             </div>
                         )}

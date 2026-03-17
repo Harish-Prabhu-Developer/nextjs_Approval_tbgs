@@ -4,7 +4,7 @@ import { Toaster } from "react-hot-toast";
 import StoreProvider from "./StoreProvider";
 
 export const metadata: Metadata = {
-  title: "VIT Admin Hub",
+  title: "TBGS Admin Hub",
   description: "Premium Business Intelligence Dashboard",
 };
 
