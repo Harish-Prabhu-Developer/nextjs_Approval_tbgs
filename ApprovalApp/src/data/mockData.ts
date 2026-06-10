@@ -41,7 +41,7 @@ export const DASHBOARD_CARDS = [
 export const COMPANY_MASTER = [
     {
         companyId: 101,
-        companyName: "Tanzania Breweries Limited",
+        companyName: "Tanzania Big Game Safaris Limited",
         address: "Plot 123, Kariakoo, Dar es Salaam",
         contactNo: "+255 22 212 3456",
         email: "info@tbl.co.tz",
@@ -49,7 +49,7 @@ export const COMPANY_MASTER = [
     },
     {
         companyId: 102,
-        companyName: "TBL Distribution Center",
+        companyName: "Tanzania Safaris & Hunting Limited",
         address: "Mikocheni Industrial Area, Dar es Salaam",
         contactNo: "+255 22 278 9012",
         email: "distribution@tbl.co.tz",
@@ -57,7 +57,7 @@ export const COMPANY_MASTER = [
     },
     {
         companyId: 103,
-        companyName: "TBL Northern Region",
+        companyName: "Conservation Foundation Tanzania",
         address: "Plot 45, Njiro Road, Arusha",
         contactNo: "+255 27 250 7890",
         email: "northern@tbl.co.tz",
@@ -196,7 +196,7 @@ export const SUB_CATEGORY_MASTER = [
         subCategoryName: "Plastics - Raw Granules",
         status: "ACTIVE"
     },
-    
+
     // Packaging Materials Subcategories
     {
         subCategoryId: 404,
@@ -216,7 +216,7 @@ export const SUB_CATEGORY_MASTER = [
         subCategoryName: "Cartons & Boxes",
         status: "ACTIVE"
     },
-    
+
     // Machinery & Spare Parts Subcategories
     {
         subCategoryId: 407,
@@ -236,7 +236,7 @@ export const SUB_CATEGORY_MASTER = [
         subCategoryName: "Bearings & Seals",
         status: "ACTIVE"
     },
-    
+
     // Chemicals & Solvents Subcategories
     {
         subCategoryId: 410,
@@ -256,7 +256,7 @@ export const SUB_CATEGORY_MASTER = [
         subCategoryName: "Adhesives & Sealants",
         status: "ACTIVE"
     },
-    
+
     // Electrical Components Subcategories
     {
         subCategoryId: 413,
@@ -299,7 +299,7 @@ export const PRODUCT_MASTER = [
         specification: "25mm diameter, 6m length, hot rolled",
         status: "ACTIVE"
     },
-    
+
     // Metals - Aluminum
     {
         productId: 1003,
@@ -310,7 +310,7 @@ export const PRODUCT_MASTER = [
         specification: "T-slot profile, anodized, 6m length",
         status: "ACTIVE"
     },
-    
+
     // Plastics - Raw Granules
     {
         productId: 1004,
@@ -321,7 +321,7 @@ export const PRODUCT_MASTER = [
         specification: "High density polyethylene, food grade, 25kg bags",
         status: "ACTIVE"
     },
-    
+
     // Bottles & Containers
     {
         productId: 1005,
@@ -341,7 +341,7 @@ export const PRODUCT_MASTER = [
         specification: "28mm neck, 20g weight, for 500ml bottles",
         status: "ACTIVE"
     },
-    
+
     // Labels & Stickers
     {
         productId: 1007,
@@ -352,7 +352,7 @@ export const PRODUCT_MASTER = [
         specification: "4x3 inches, glossy finish, per 1000 labels",
         status: "ACTIVE"
     },
-    
+
     // Conveyor Parts
     {
         productId: 1008,
@@ -363,7 +363,7 @@ export const PRODUCT_MASTER = [
         specification: "50mm diameter, 600mm length, with bearings",
         status: "ACTIVE"
     },
-    
+
     // Bearings & Seals
     {
         productId: 1009,
@@ -374,7 +374,7 @@ export const PRODUCT_MASTER = [
         specification: "20x47x14mm, double rubber sealed",
         status: "ACTIVE"
     },
-    
+
     // Industrial Lubricants
     {
         productId: 1010,
@@ -385,7 +385,7 @@ export const PRODUCT_MASTER = [
         specification: "Food grade, high temperature, 18kg pail",
         status: "ACTIVE"
     },
-    
+
     // Control Panels
     {
         productId: 1011,
@@ -396,7 +396,7 @@ export const PRODUCT_MASTER = [
         specification: "1214C AC/DC/Relay, 14 I/O",
         status: "ACTIVE"
     },
-    
+
     // Sensors & Switches
     {
         productId: 1012,
@@ -407,7 +407,7 @@ export const PRODUCT_MASTER = [
         specification: "M12, 4mm sensing distance, PNP NO",
         status: "ACTIVE"
     },
-    
+
     // Additional Products
     {
         productId: 1013,
@@ -777,7 +777,7 @@ export const PURCHASE_ORDER_DTL = [
         truckId: 1,
         trailerId: 1
     },
-    
+
     // For PO/2024/002
     {
         sno: 11003,
@@ -887,7 +887,7 @@ export const PURCHASE_ORDER_DTL = [
         truckId: 2,
         trailerId: 2
     },
-    
+
     // For PO/2024/004
     {
         sno: 11005,
@@ -971,7 +971,7 @@ export const PURCHASE_ORDER_DTL = [
         truckId: 3,
         trailerId: 3
     },
-    
+
     // For PO/2024/005
     {
         sno: 11007,
@@ -1141,7 +1141,7 @@ export const PURCHASE_ORDER_CONVERSATION_DTL = [
         createdBy: 'system',
         createdDate: '2024-01-12 11:30:00'
     },
-    
+
     // For PO/2024/004 (Pending approval conversation - query)
     {
         sno: 13005,
@@ -1154,7 +1154,7 @@ export const PURCHASE_ORDER_CONVERSATION_DTL = [
         createdBy: 'system',
         createdDate: '2024-01-17 10:30:00'
     },
-    
+
     // Query for PO/2024/001 - requesting remarks
     {
         sno: 13006,
@@ -1171,7 +1171,7 @@ export const PURCHASE_ORDER_CONVERSATION_DTL = [
 
 // Purchase Order Files Upload (including PDF documents for invoice view)
 export const PURCHASE_ORDER_FILES_UPLOAD = [
-     {
+    {
         sno: 14001,
         poRefNo: "PO/2024/001",
         descriptionDetails: "Supplier Proforma Invoice",
@@ -1195,7 +1195,7 @@ export const PURCHASE_ORDER_FILES_UPLOAD = [
         createdDate: '2024-01-15 10:30:00',
         fileType: 'SPECIFICATION'
     },
-  
+
     {
         sno: 14003,
         poRefNo: 'PO/2024/004',

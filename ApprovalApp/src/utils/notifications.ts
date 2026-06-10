@@ -15,10 +15,17 @@ Notifications.setNotificationHandler({
 });
 
 export async function registerForPushNotificationsAsync() {
-  let token;
-
   if (Platform.OS === 'web') {
     return;
+  }
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#4f46e5',
+    });
   }
 
   if (Device.isDevice) {
@@ -35,29 +42,22 @@ export async function registerForPushNotificationsAsync() {
       return;
     }
 
-    // Replace with your project ID from app.json if using EAS
     const projectId = Constants?.expoConfig?.extra?.eas?.projectId || Constants?.easConfig?.projectId;
+    const runningInExpoGo = Constants.expoGoConfig != null;
     
     try {
-        token = (await Notifications.getExpoPushTokenAsync({
-            projectId,
-        })).data;
-        console.log('Expo Push Token (Working in Expo Go):', token);
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      console.log(
+        runningInExpoGo
+          ? 'Expo Push Token registered. Android remote notifications require a development build on SDK 53+.'
+          : 'Expo Push Token registered:',
+        token,
+      );
+      return token;
     } catch (e) {
-        console.error('Push Token Error (Dev Build required for FCM):', e);
+      console.error('Expo Push Token registration failed:', e);
     }
   } else {
     console.log('Must use physical device for Push Notifications');
   }
-
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#4f46e5',
-    });
-  }
-
-  return token;
 }

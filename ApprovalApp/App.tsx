@@ -17,8 +17,7 @@ import { navigationRef } from './src/navigation/NavigationService';
 
 function AppContent() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, hydrated, user, token: authToken } = useAppSelector((state) => state.auth);
-  const [expoPushToken, setExpoPushToken] = useState('');
+  const { isAuthenticated, hydrated } = useAppSelector((state) => state.auth);
   const [notification, setNotification] = useState<Notifications.Notification | undefined>(undefined);
   const notificationListener = useRef<Notifications.Subscription>(undefined);
   const responseListener = useRef<Notifications.Subscription>(undefined);
@@ -30,9 +29,7 @@ function AppContent() {
     if (isAuthenticated) {
       registerForPushNotificationsAsync().then(token => {
         if (token) {
-          setExpoPushToken(token);
-          // Here you should ideally call an API to save the token for the user
-          console.log('FCM Token registered:', token);
+          console.log('Expo Push Token ready:', token);
         }
       });
     }

@@ -49,6 +49,10 @@ export async function PUT(
 
         const updatedDoc = updatedRequest[0];
 
+        if (!updatedDoc) {
+            return NextResponse.json({ message: 'Approval request not found' }, { status: 404 });
+        }
+
         // Send Push Notifications for Update
         void (async () => {
             try {

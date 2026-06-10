@@ -8,6 +8,13 @@
       "when": 1772800221143,
       "tag": "0000_right_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781001582995,
+      "tag": "0001_fearless_the_captain",
+      "breakpoints": true
     }
   ]
 }

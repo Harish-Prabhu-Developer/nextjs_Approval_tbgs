@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { approvalRequests, purchaseOrderHdr, dashboardCards } from '@/db/schema';
+import { approvalRequests, purchaseOrderHdr, dashboardCards, companies } from '@/db/schema';
 import { eq, inArray, ilike, or } from 'drizzle-orm';
-import { MOCK_APPROVAL_DATA } from '@/app/config/mockData';
+import { MOCK_APPROVAL_DATA, COMPANY_MASTER } from '@/app/config/mockData';
 
 export async function GET(
     request: Request,
@@ -12,6 +12,9 @@ export async function GET(
     const nType = approvalType.toLowerCase();
 
     try {
+        const companiesList = await db.select().from(companies);
+        const companyMap = new Map(companiesList.map(c => [c.companyId, c.companyName]));
+
         let dbData: any[] = [];
 
         // 1. Resolve the URL parameter (routeSlug) to the correct internal approvalType
@@ -28,16 +31,22 @@ export async function GET(
         }
 
         if (nType === 'purchase-order' || targetApprovalType.toLowerCase() === 'purchase-order') {
-            dbData = await db.select().from(purchaseOrderHdr);
+            dbData = (await db.select().from(purchaseOrderHdr)).map(r => ({
+                ...r,
+                companyName: r.companyId != null ? companyMap.get(r.companyId) || COMPANY_MASTER.find((c: any) => c.companyId === r.companyId)?.companyName || null : null
+            }));
         } else {
-            dbData = await db.select()
+            dbData = (await db.select()
                 .from(approvalRequests)
                 .where(
                     or(
                         ilike(approvalRequests.approvalType, approvalType),
                         ilike(approvalRequests.approvalType, targetApprovalType)
                     )
-                );
+                )).map(r => ({
+                    ...r,
+                    companyName: r.companyId != null ? companyMap.get(r.companyId) || COMPANY_MASTER.find((c: any) => c.companyId === r.companyId)?.companyName || null : null
+                }));
         }
 
         // Get mock data for this type
@@ -81,7 +90,7 @@ export async function PATCH(
         }
 
         const table = nType === 'purchase-order' ? purchaseOrderHdr : approvalRequests;
-        
+
         const updateData: any = {
             finalResponseStatus: status,
             finalResponseRemarks: remarks,
@@ -94,7 +103,7 @@ export async function PATCH(
             .where(inArray(table.sno, ids))
             .returning();
 
-        return NextResponse.json({ 
+        return NextResponse.json({
             message: `Successfully updated ${result.length} records`,
             updatedCount: result.length
         });

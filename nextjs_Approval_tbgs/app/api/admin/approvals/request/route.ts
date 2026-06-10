@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { approvalRequests, purchaseOrderHdr, dashboardCards, users } from '@/db/schema';
+import { approvalRequests, purchaseOrderHdr, dashboardCards, users, companies } from '@/db/schema';
 import { eq, arrayContains } from 'drizzle-orm';
 import { MOCK_APPROVAL_DATA } from '@/app/config/mockData';
+import { COMPANY_MASTER } from '@/app/config/mockData';
 import { sendPushNotification } from '@/lib/notifications';
 
 export async function GET() {
     try {
+        const companiesList = await db.select().from(companies);
+        const companyMap = new Map(companiesList.map(c => [c.companyId, c.companyName]));
+
         const dbRequests = await db.select().from(approvalRequests);
         const poRequests = await db.select().from(purchaseOrderHdr);
         
@@ -24,10 +28,16 @@ export async function GET() {
         const typedPoRequests = poRequests.map(po => ({
              ...po,
              approvalType: 'purchase-order', // so the table can display it properly
-             statusEntry: po.finalResponseStatus || po.statusEntry || 'PENDING'
+             statusEntry: po.finalResponseStatus || po.statusEntry || 'PENDING',
+             companyName: po.companyId != null ? companyMap.get(po.companyId) || COMPANY_MASTER.find((c: any) => c.companyId === po.companyId)?.companyName || null : null
         }));
 
-        const mergedDbRequests = [...dbRequests, ...typedPoRequests];
+        const typedDbRequests = dbRequests.map(r => ({
+             ...r,
+             companyName: r.companyId != null ? companyMap.get(r.companyId) || COMPANY_MASTER.find((c: any) => c.companyId === r.companyId)?.companyName || null : null
+        }));
+
+        const mergedDbRequests = [...typedDbRequests, ...typedPoRequests];
 
         // Ensure we deduplicate mock data that has the same poRefNo as DB data
         const dbPoRefNos = new Set(mergedDbRequests.map((r: any) => r.poRefNo));

@@ -6,7 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useAppDispatch } from '../redux/hooks';
 import { loginUser } from '../redux/slices/authSlice';
 import { REMEMBERED_USERNAME_KEY, REMEMBER_ME_KEY } from '../constants/storage';
-import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 
 type ToastType = 'success' | 'error' | 'info';

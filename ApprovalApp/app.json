@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ApprovalApp",
+    "name": "Tbgs",
     "slug": "ApprovalApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,16 +8,16 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.harishprabhu.approvalapp"
+      "bundleIdentifier": "com.visioninfotech.tbgs"
     },
     "android": {
-      "package": "com.visioninfotech.app",
+      "package": "com.visioninfotech.tbgs",
       "permissions": [
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
