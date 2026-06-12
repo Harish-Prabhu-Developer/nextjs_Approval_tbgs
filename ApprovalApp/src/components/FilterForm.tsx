@@ -310,7 +310,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
 
                     {isAdvancedOpen && (
                         <View className="mt-4">
-                            {renderPicker("Currency", "currency", ["TSH", "USD"], "All Currencies")}
+                            {renderPicker("Currency", "currency", ["TZS", "USD", "EUR", "GBP", "INR", "AED"], "All Currencies")}
                             <View className="flex-row gap-4 mb-4">
                                 <View className="flex-1">
                                     <Text className="text-[13px] font-bold text-slate-500 mb-1.5 ml-1">Min Amount</Text>

@@ -237,8 +237,8 @@ const buildInvoicePdfBinary = (params: {
 
     // Header block
     text("PURCHASE INVOICE", left, y, 16, true);
-    text(`PO Ref: ${header.poRefNo || row.poRefNo || "-"}`, left, y - 16, 9);
-    text(`PO Date: ${header.poDate || "-"}`, left, y - 28, 9);
+    text(`Ref: ${header.poRefNo || row.poRefNo || "-"}`, left, y - 16, 9);
+    text(`Date: ${header.poDate || "-"}`, left, y - 28, 9);
     text(`Generated: ${new Date().toLocaleDateString()}`, left, y - 40, 9);
 
     const qrBoxX = right - 108;
@@ -688,7 +688,7 @@ export default function ApprovalScreen() {
         <div><strong>PO Ref:</strong> ${poRef}</div>
         <div><strong>PO Date:</strong> ${poDate}</div>
         <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
-        <div><strong>Currency:</strong> ${row.currencyType || 'USD'}</div>
+        <div><strong>Currency:</strong> ${row.currencyType || 'TZS'}</div>
       </div>
     </div>
     <div class="qr-box">
@@ -989,7 +989,7 @@ export default function ApprovalScreen() {
                                 <Text className="text-indigo-100 text-[10px] font-black uppercase tracking-widest">Total Value</Text>
                                 <Text className="text-white text-lg font-black">
                                     {filteredData.reduce((acc, curr) => acc + Number(curr.totalFinalProductionHdrAmount || 0), 0).toLocaleString()}
-                                    <Text className="text-indigo-200 text-xs font-medium"> USD</Text>
+                                    <Text className="text-indigo-200 text-xs font-medium"> TZS</Text>
                                 </Text>
                             </View>
                         </View>

@@ -131,9 +131,9 @@ function getTableColumns(
             )
         },
         { key: 'sno', label: 'SNO', render: (val: number) => <span className="font-bold text-slate-800">{val}</span> },
-        { 
-            key: 'companyId', 
-            label: 'Company', 
+        {
+            key: 'companyId',
+            label: 'Company',
             render: (id: any) => {
                 // eslint-disable-next-line eqeqeq
                 const company = COMPANY_MASTER.find(c => c.companyId == id);
@@ -148,9 +148,9 @@ function getTableColumns(
                 </span>
             )
         },
-        { 
-            key: 'supplierId', 
-            label: 'Supplier', 
+        {
+            key: 'supplierId',
+            label: 'Supplier',
             render: (value: any) => {
                 // eslint-disable-next-line eqeqeq
                 const supplier = SUPPLIER_MASTER.find(s => s.supplierId == value);
@@ -161,9 +161,9 @@ function getTableColumns(
                 );
             }
         },
-        { 
-            key: 'poStoreId', 
-            label: 'Dept', 
+        {
+            key: 'poStoreId',
+            label: 'Dept',
             responsiveClass: 'hidden md:table-cell',
             render: (id: any) => {
                 // eslint-disable-next-line eqeqeq
@@ -209,7 +209,7 @@ function getTableColumns(
                     'PENDING': 'bg-amber-100 text-amber-700 border-amber-200',
                     'HOLD': 'bg-indigo-100 text-indigo-700 border-indigo-200',
                 };
-                
+
                 return (
                     <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border shadow-sm ${colors[status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                         {status}
@@ -286,7 +286,7 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                 );
                 // Refresh data
                 dispatch(fetchApprovalRecords(approvalType));
-                
+
                 setSelectedRows([]);
                 setPendingStatusUpdate(null);
                 setRemarksInput("");
@@ -452,8 +452,8 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
 
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9);
-            doc.text(`PO Ref: ${header.poRefNo || row.poRefNo || "-"}`, margin, 21);
-            doc.text(`PO Date: ${header.poDate || "-"}`, margin, 26);
+            doc.text(`Ref: ${header.poRefNo || row.poRefNo || "-"}`, margin, 21);
+            doc.text(`Date: ${header.poDate || "-"}`, margin, 26);
             doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, 31);
 
             doc.setFont("helvetica", "bold");

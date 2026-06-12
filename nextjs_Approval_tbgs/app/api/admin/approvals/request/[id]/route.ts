@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { approvalRequests, dashboardCards, users } from '@/db/schema';
+import { approvalRequests, approvalDetails, dashboardCards, users } from '@/db/schema';
 import { eq, arrayContains } from 'drizzle-orm';
 import { sendPushNotification } from '@/lib/notifications';
 
@@ -23,7 +23,10 @@ export async function PUT(
             currencyType,
             poStoreId,
             poDate,
-            requestedBy
+            requestedBy,
+            productLineItems,
+            truckId,
+            trailerId
         } = body;
 
         const updatedRequest = await db.update(approvalRequests)
@@ -39,7 +42,6 @@ export async function PUT(
                 remarks,
                 requestedBy,
                 statusEntry,
-                // Mirror statusEntry into finalResponseStatus so it shows in the approvals list
                 finalResponseStatus: statusEntry,
                 totalFinalProductionHdrAmount: totalAmount,
                 modifiedDate: new Date(),
@@ -48,6 +50,29 @@ export async function PUT(
             .returning();
 
         const updatedDoc = updatedRequest[0];
+
+        // Update product line items: delete old, insert new
+        if (updatedDoc && poRefNo) {
+            await db.delete(approvalDetails).where(eq(approvalDetails.refNo, poRefNo));
+            if (Array.isArray(productLineItems) && productLineItems.length > 0) {
+                const detailItems = productLineItems
+                    .filter((li: any) => li.productId)
+                    .map((li: any) => ({
+                        sno: Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000) + Math.floor(Math.random() * 100),
+                        refNo: poRefNo,
+                        productId: Number(li.productId),
+                        productName: li.productName || null,
+                        specification: li.specification || null,
+                        orderedQty: li.orderedQty || null,
+                        unitPrice: li.unitPrice || null,
+                        amount: li.amount || null,
+                        remarks: li.remarks || null,
+                    }));
+                if (detailItems.length > 0) {
+                    await db.insert(approvalDetails).values(detailItems);
+                }
+            }
+        }
 
         if (!updatedDoc) {
             return NextResponse.json({ message: 'Approval request not found' }, { status: 404 });

@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { approvalRequests, purchaseOrderHdr, dashboardCards, users, companies } from '@/db/schema';
-import { eq, arrayContains } from 'drizzle-orm';
-import { MOCK_APPROVAL_DATA } from '@/app/config/mockData';
-import { COMPANY_MASTER } from '@/app/config/mockData';
+import { approvalRequests, approvalDetails, purchaseOrderHdr, dashboardCards, users, companies } from '@/db/schema';
+import { eq, inArray, arrayContains } from 'drizzle-orm';
 import { sendPushNotification } from '@/lib/notifications';
 
 export async function GET() {
@@ -13,40 +11,22 @@ export async function GET() {
 
         const dbRequests = await db.select().from(approvalRequests);
         const poRequests = await db.select().from(purchaseOrderHdr);
-        
-        let allMockData: any[] = [];
-        Object.keys(MOCK_APPROVAL_DATA).forEach((key) => {
-             const mockArray = MOCK_APPROVAL_DATA[key];
-             if (Array.isArray(mockArray)) {
-                 // Ensure mock data has the correct approvalType if missing
-                 const typedMockArray = mockArray.map(m => ({ ...m, approvalType: m.approvalType || key }));
-                 allMockData = [...allMockData, ...typedMockArray];
-             }
-        });
 
-        // Combine DB PO requests with DB generic requests
         const typedPoRequests = poRequests.map(po => ({
              ...po,
-             approvalType: 'purchase-order', // so the table can display it properly
-             statusEntry: po.finalResponseStatus || po.statusEntry || 'PENDING',
-             companyName: po.companyId != null ? companyMap.get(po.companyId) || COMPANY_MASTER.find((c: any) => c.companyId === po.companyId)?.companyName || null : null
+             approvalType: 'purchase-order',
+             statusEntry: po.finalResponseStatus || po.statusEntry || 'PENDING'
         }));
 
         const typedDbRequests = dbRequests.map(r => ({
              ...r,
-             companyName: r.companyId != null ? companyMap.get(r.companyId) || COMPANY_MASTER.find((c: any) => c.companyId === r.companyId)?.companyName || null : null
+             companyName: r.companyId != null ? companyMap.get(r.companyId) || null : null
         }));
 
-        const mergedDbRequests = [...typedDbRequests, ...typedPoRequests];
-
-        // Ensure we deduplicate mock data that has the same poRefNo as DB data
-        const dbPoRefNos = new Set(mergedDbRequests.map((r: any) => r.poRefNo));
-        const uniqueMockData = allMockData.filter((m: any) => !dbPoRefNos.has(m.poRefNo));
-
-        const allRequests = [...mergedDbRequests, ...uniqueMockData].sort((a, b) => {
+        const allRequests = [...typedDbRequests, ...typedPoRequests].sort((a, b) => {
             const dateA = new Date(a.createdDate || a.poDate || 0).getTime();
             const dateB = new Date(b.createdDate || b.poDate || 0).getTime();
-            return dateB - dateA; // newest first
+            return dateB - dateA;
         });
 
         return NextResponse.json(allRequests);
@@ -71,10 +51,12 @@ export async function POST(request: Request) {
             currencyType,
             poStoreId,
             poDate,
-            statusEntry
+            statusEntry,
+            productLineItems,
+            truckId,
+            trailerId
         } = body;
 
-        // Use timestamp (seconds) + random to avoid primary key collisions and fit in integer range
         const sno = Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000);
 
         const newRequest = await db.insert(approvalRequests).values({
@@ -89,13 +71,32 @@ export async function POST(request: Request) {
             remarks,
             currencyType: currencyType || 'USD',
             statusEntry: statusEntry || 'PENDING',
-            // Mirror statusEntry into finalResponseStatus so it appears in the approvals list
             finalResponseStatus: statusEntry || 'PENDING',
             totalFinalProductionHdrAmount: totalAmount || 0,
             requestedBy: requestedBy || 'admin',
             requestedDate: new Date(),
             createdDate: new Date(),
         }).returning();
+
+        // Save product line items
+        if (Array.isArray(productLineItems) && productLineItems.length > 0) {
+            const detailItems = productLineItems
+                .filter((li: any) => li.productId)
+                .map((li: any) => ({
+                    sno: Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000) + Math.floor(Math.random() * 100),
+                    refNo: poRefNo,
+                    productId: Number(li.productId),
+                    productName: li.productName || null,
+                    specification: li.specification || null,
+                    orderedQty: li.orderedQty || null,
+                    unitPrice: li.unitPrice || null,
+                    amount: li.amount || null,
+                    remarks: li.remarks || null,
+                }));
+            if (detailItems.length > 0) {
+                await db.insert(approvalDetails).values(detailItems);
+            }
+        }
 
         const createdRequest = newRequest[0];
 
@@ -138,5 +139,41 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('Error requesting approval:', error);
         return NextResponse.json({ message: 'Error requesting approval' }, { status: 500 });
+    }
+}
+
+export async function PATCH(request: Request) {
+    try {
+        const body = await request.json();
+        const { ids, status, remarks } = body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return NextResponse.json({ message: 'No IDs provided' }, { status: 400 });
+        }
+
+        const updateData: any = {
+            finalResponseStatus: status,
+            finalResponseRemarks: remarks,
+            finalResponseDate: new Date(),
+            modifiedDate: new Date()
+        };
+
+        const result = await db.update(approvalRequests)
+            .set(updateData)
+            .where(inArray(approvalRequests.sno, ids))
+            .returning();
+
+        // Also update purchase_order_hdr if any of the IDs match
+        await db.update(purchaseOrderHdr)
+            .set(updateData)
+            .where(inArray(purchaseOrderHdr.sno, ids));
+
+        return NextResponse.json({
+            message: `Successfully updated ${result.length} records`,
+            updatedCount: result.length
+        });
+    } catch (error) {
+        console.error('Error updating approvals:', error);
+        return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
     }
 }

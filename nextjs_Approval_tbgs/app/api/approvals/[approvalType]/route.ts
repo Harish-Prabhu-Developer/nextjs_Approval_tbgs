@@ -1,23 +1,18 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { approvalRequests, purchaseOrderHdr, dashboardCards, companies } from '@/db/schema';
+import { approvalRequests, dashboardCards, companies } from '@/db/schema';
 import { eq, inArray, ilike, or } from 'drizzle-orm';
-import { MOCK_APPROVAL_DATA, COMPANY_MASTER } from '@/app/config/mockData';
 
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ approvalType: string }> }
 ) {
     const { approvalType } = await params;
-    const nType = approvalType.toLowerCase();
 
     try {
         const companiesList = await db.select().from(companies);
         const companyMap = new Map(companiesList.map(c => [c.companyId, c.companyName]));
 
-        let dbData: any[] = [];
-
-        // 1. Resolve the URL parameter (routeSlug) to the correct internal approvalType
         let targetApprovalType = approvalType;
         const cardMatch = await db.select().from(dashboardCards).where(
             or(
@@ -30,47 +25,28 @@ export async function GET(
             targetApprovalType = cardMatch[0].approvalType;
         }
 
-        if (nType === 'purchase-order' || targetApprovalType.toLowerCase() === 'purchase-order') {
-            dbData = (await db.select().from(purchaseOrderHdr)).map(r => ({
+        const dbData = (await db.select()
+            .from(approvalRequests)
+            .where(
+                or(
+                    ilike(approvalRequests.approvalType, approvalType),
+                    ilike(approvalRequests.approvalType, targetApprovalType)
+                )
+            )).map(r => ({
                 ...r,
-                companyName: r.companyId != null ? companyMap.get(r.companyId) || COMPANY_MASTER.find((c: any) => c.companyId === r.companyId)?.companyName || null : null
+                companyName: r.companyId != null ? companyMap.get(r.companyId) || null : null
             }));
-        } else {
-            dbData = (await db.select()
-                .from(approvalRequests)
-                .where(
-                    or(
-                        ilike(approvalRequests.approvalType, approvalType),
-                        ilike(approvalRequests.approvalType, targetApprovalType)
-                    )
-                )).map(r => ({
-                    ...r,
-                    companyName: r.companyId != null ? companyMap.get(r.companyId) || COMPANY_MASTER.find((c: any) => c.companyId === r.companyId)?.companyName || null : null
-                }));
-        }
 
-        // Get mock data for this type
-        const mockData: any[] = MOCK_APPROVAL_DATA[nType] || MOCK_APPROVAL_DATA[targetApprovalType.toLowerCase()] || [];
-
-        // Merge: DB records first, then mock records that don't conflict by poRefNo
-        // This ensures admin-created DB records always show up alongside mock data
-        const dbPoRefNos = new Set(dbData.map((r: any) => r.poRefNo));
-        const uniqueMockData = mockData.filter((m: any) => !dbPoRefNos.has(m.poRefNo));
-
-        const mergedData = [...dbData, ...uniqueMockData];
-
-        // Sort by createdDate descending (newest first)
-        mergedData.sort((a, b) => {
+        dbData.sort((a, b) => {
             const dateA = new Date(a.createdDate || a.poDate || 0).getTime();
             const dateB = new Date(b.createdDate || b.poDate || 0).getTime();
             return dateB - dateA;
         });
 
-        return NextResponse.json(mergedData);
+        return NextResponse.json(dbData);
     } catch (error) {
         console.error('Error fetching approvals:', error);
-        // On error, still return mock data as safe fallback
-        return NextResponse.json(MOCK_APPROVAL_DATA[nType] || []);
+        return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
     }
 }
 
@@ -79,7 +55,6 @@ export async function PATCH(
     { params }: { params: Promise<{ approvalType: string }> }
 ) {
     const { approvalType } = await params;
-    const nType = approvalType.toLowerCase();
 
     try {
         const body = await request.json();
@@ -89,8 +64,6 @@ export async function PATCH(
             return NextResponse.json({ message: 'No IDs provided' }, { status: 400 });
         }
 
-        const table = nType === 'purchase-order' ? purchaseOrderHdr : approvalRequests;
-
         const updateData: any = {
             finalResponseStatus: status,
             finalResponseRemarks: remarks,
@@ -98,9 +71,9 @@ export async function PATCH(
             modifiedDate: new Date()
         };
 
-        const result = await db.update(table)
+        const result = await db.update(approvalRequests)
             .set(updateData)
-            .where(inArray(table.sno, ids))
+            .where(inArray(approvalRequests.sno, ids))
             .returning();
 
         return NextResponse.json({

@@ -483,7 +483,7 @@ export const MOCK_APPROVAL_DATA: Record<string, any[]> = {
             modifiedDate: '2024-01-15 10:30:00',
             paymentTerm: '30 days from invoice',
             modeOfPayment: 'BANK_TRANSFER',
-            currencyType: 'USD',
+            currencyType: 'TZS',
             suplierProformaNumber: 'PI/2024/001',
             shipmentMode: 'AIR',
             priceTerms: 'FOB',
@@ -571,7 +571,7 @@ export const MOCK_APPROVAL_DATA: Record<string, any[]> = {
             createdBy: 'u.admin',
             createdDate: '2024-01-16 08:30:00',
             totalFinalProductionHdrAmount: 1200.00,
-            currencyType: 'USD',
+            currencyType: 'TZS',
             requestedBy: 'admin',
             requestedDate: '2024-01-16 08:30:00',
             response1Status: 'PENDING',
@@ -610,7 +610,7 @@ export const MOCK_APPROVAL_DATA: Record<string, any[]> = {
             createdBy: 'u.it',
             createdDate: '2024-01-17 11:20:00',
             totalFinalProductionHdrAmount: 12500.00,
-            currencyType: 'USD',
+            currencyType: 'TZS',
             requestedBy: 'it_dept',
             requestedDate: '2024-01-17 11:20:00',
             response1Status: 'PENDING',
@@ -629,7 +629,7 @@ export const MOCK_APPROVAL_DATA: Record<string, any[]> = {
             remarks: 'AC Maintenance',
             statusEntry: 'PENDING',
             totalFinalProductionHdrAmount: 1500.00,
-            currencyType: 'USD',
+            currencyType: 'TZS',
             requestedBy: 'facility_mgr',
             finalResponseStatus: 'PENDING'
         },
@@ -661,7 +661,7 @@ export const MOCK_APPROVAL_DATA: Record<string, any[]> = {
             remarks: 'Price Hike Approval for RM',
             statusEntry: 'PENDING',
             totalFinalProductionHdrAmount: 500.00,
-            currencyType: 'USD',
+            currencyType: 'TZS',
             requestedBy: 'procurement',
             finalResponseStatus: 'PENDING'
         },
@@ -693,7 +693,7 @@ export const MOCK_APPROVAL_DATA: Record<string, any[]> = {
             remarks: 'Damaged Goods Return',
             statusEntry: 'PENDING',
             totalFinalProductionHdrAmount: 2500.00,
-            currencyType: 'USD',
+            currencyType: 'TZS',
             requestedBy: 'sales_mgr',
             finalResponseStatus: 'PENDING'
         }

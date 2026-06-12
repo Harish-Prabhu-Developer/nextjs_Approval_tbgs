@@ -45,6 +45,7 @@ const ADMIN_MENU_ITEMS: MenuItem[] = [
     { id: "admin-suppliers", name: "Manage Suppliers", pendingCount: 0, icon: "Truck", path: "/admin/suppliers", permissionColumn: "admin" },
     { id: "admin-products", name: "Manage Products", pendingCount: 0, icon: "Package", path: "/admin/products", permissionColumn: "admin" },
     { id: "admin-trucks", name: "Manage Trucks", pendingCount: 0, icon: "Navigation", path: "/admin/trucks", permissionColumn: "admin" },
+    { id: "admin-trailers", name: "Manage Trailers", pendingCount: 0, icon: "Container", path: "/admin/trailers", permissionColumn: "admin" },
     { id: "admin-approvals", name: "Manage Approvals", pendingCount: 0, icon: "Settings", path: "/admin/approvals", permissionColumn: "admin" },
 ];
 
