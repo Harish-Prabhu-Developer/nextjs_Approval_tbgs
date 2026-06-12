@@ -4,41 +4,32 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { RefreshCw } from "lucide-react-native";
 
-import { DASHBOARD_CARDS } from "../data/mockData";
 import { DrawerParamList } from "../navigation/types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DashboardCard from "../components/DashboardCard";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
-import { fetchApprovalCounts } from "../redux/slices/dashboardSlice";
+import { fetchApprovalCounts, fetchDashboardCards } from "../redux/slices/dashboardSlice";
 
 type DashboardNav = DrawerNavigationProp<DrawerParamList>;
-
-const routeMap: Record<string, keyof DrawerParamList> = {
-  "purchase-order": "PurchaseOrder",
-  "work-order": "WorkOrder",
-  "price-approval": "PriceApproval",
-  "sales-return-approval": "SalesReturn",
-};
 
 export default function DashboardScreen() {
   const navigation = useNavigation<DashboardNav>();
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const { counts, loading } = useAppSelector((state) => state.dashboard);
+  const { counts, cards, loading } = useAppSelector((state) => state.dashboard);
   const [refreshing, setRefreshing] = useState(false);
 
-  const dashboardCards = useMemo(
-    () =>
-      DASHBOARD_CARDS.filter((card) =>
-        user?.permissions?.includes(card.permissionColumn),
-      ),
-    [user],
+  const allowedCards = useMemo(
+    () => (Array.isArray(cards) ? cards : []).filter((card: any) =>
+      user?.permissions?.includes(card.permissionColumn)
+    ),
+    [user, cards],
   );
 
   const displayName = user?.name || "User";
 
-  const getPendingCount = (card: any) => {
+  const getCount = (card: any) => {
     const permissionCount = Number(counts?.[card.permissionColumn] ?? 0);
     const routeCount = Number(counts?.[card.routeSlug] ?? 0);
     return Math.max(permissionCount, routeCount);
@@ -47,13 +38,17 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       dispatch(fetchApprovalCounts());
+      dispatch(fetchDashboardCards());
     }, [dispatch]),
   );
 
   const handleRefresh = async () => {
     if (refreshing || loading) return;
     setRefreshing(true);
-    await dispatch(fetchApprovalCounts());
+    await Promise.all([
+      dispatch(fetchApprovalCounts()),
+      dispatch(fetchDashboardCards()),
+    ]);
     setRefreshing(false);
   };
 
@@ -78,7 +73,7 @@ export default function DashboardScreen() {
         </Pressable>
       </View>
       <ScrollView className="flex-1 bg-[#f0f0f0]" contentContainerStyle={{ paddingBottom: insets.bottom }}>
-        {dashboardCards.length === 0 ? (
+        {allowedCards.length === 0 ? (
           <View className="rounded-2xl border border-slate-200 bg-white p-6">
             <Text className="text-center text-base font-bold text-slate-700">No Cards Available</Text>
             <Text className="mt-1 text-center text-sm font-medium text-slate-500">
@@ -87,8 +82,8 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <View className="flex-row flex-wrap justify-between">
-            {dashboardCards.map((card) => {
-              const count = getPendingCount(card);
+            {allowedCards.map((card: any) => {
+              const count = getCount(card);
 
               return (
                 <DashboardCard
@@ -102,14 +97,11 @@ export default function DashboardScreen() {
                   }}
                   onPress={() => {
                     if (count > 0) {
-                      const routeName = routeMap[card.routeSlug];
-                      if (routeName) {
-                        navigation.navigate(routeName as any, {
-                          title: card.cardTitle,
-                          subtitle: "Review pending requests",
-                          routeSlug: card.routeSlug,
-                        } as any);
-                      }
+                      navigation.navigate(card.routeSlug as any, {
+                        title: card.cardTitle,
+                        subtitle: "Review pending requests",
+                        routeSlug: card.routeSlug,
+                      } as any);
                     } else {
                       Alert.alert("No pending entries", `No pending requests for ${card.cardTitle}`);
                     }

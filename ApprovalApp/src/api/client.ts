@@ -28,11 +28,19 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (error: any) {
+    if (error.message === 'Network request failed' || error.message.includes('fetch')) {
+      throw new Error(`Network request failed. Trying to reach: ${url}. If you recently changed .env, please restart Expo with 'npx expo start -c'.`);
+    }
+    throw error;
+  }
 
   const raw = await response.text();
   const payload = raw ? JSON.parse(raw) : null;

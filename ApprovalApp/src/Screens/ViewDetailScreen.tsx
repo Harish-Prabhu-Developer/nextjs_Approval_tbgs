@@ -25,7 +25,8 @@ import {
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
-import { COMPANY_MASTER, STORE_MASTER, SUPPLIER_MASTER, MOCK_APPROVAL_DATA } from '../data/mockData';
+import { useAppDispatch, useAppSelector } from '../redux/hooks';
+import { fetchApprovalDetail } from '../redux/slices/approvalSlice';
 
 type ViewDetailNavProp = DrawerNavigationProp<RootStackParamList, 'ViewDetail'>;
 
@@ -33,33 +34,31 @@ export default function ViewDetailScreen() {
     const route = useRoute();
     const navigation = useNavigation<ViewDetailNavProp>();
     const insets = useSafeAreaInsets();
+    const dispatch = useAppDispatch();
+    const { currentRecord, loading: reduxLoading } = useAppSelector((state) => state.approval);
 
     // Safety check for parameters
     const params = (route.params as any) || {};
     const { id, approvalType, item: propItem } = params;
 
     const [isLoading, setIsLoading] = useState(!propItem);
-    const [item, setItem] = useState<any>(propItem);
 
     useEffect(() => {
-        // If we don't have the full item data but have an ID and Type, "fetch" it
         if (!propItem && id && approvalType) {
             setIsLoading(true);
-            setTimeout(() => {
-                const dataPool = MOCK_APPROVAL_DATA[approvalType] || [];
-                // Find by sno or id
-                const foundItem = dataPool.find(i => String(i.id || i.sno) === String(id));
-
-                if (foundItem) {
-                    setItem(foundItem);
-                }
-                setIsLoading(false);
-            }, 800);
+            dispatch(fetchApprovalDetail({ type: approvalType, id: String(id) }));
         } else if (propItem) {
-            setItem(propItem);
             setIsLoading(false);
         }
-    }, [id, approvalType, propItem]);
+    }, [id, approvalType, propItem, dispatch]);
+
+    useEffect(() => {
+        if (!propItem && currentRecord && !reduxLoading) {
+            setIsLoading(false);
+        }
+    }, [currentRecord, reduxLoading, propItem]);
+
+    const item = propItem || currentRecord;
 
     const statusInfo = useMemo(() => {
         const s = (item?.finalResponseStatus || item?.status || 'PENDING').toUpperCase();
@@ -127,9 +126,9 @@ export default function ViewDetailScreen() {
         );
     }
 
-    const companyName = COMPANY_MASTER.find(c => c.companyId === item?.companyId)?.companyName || item?.companyId || 'N/A';
-    const deptName = STORE_MASTER.find(s => s.storeId === item?.poStoreId)?.storeName || item?.poStoreId || 'N/A';
-    const supplierName = SUPPLIER_MASTER.find(s => s.supplierId === item?.supplierId)?.supplierName || 'N/A';
+    const companyName = item?.companyName || item?.companyId || 'N/A';
+    const deptName = item?.storeName || item?.poStoreId || 'N/A';
+    const supplierName = item?.supplierName || 'N/A';
 
     const renderStatusBadge = (status: string) => {
         const s = (status || 'PENDING').toUpperCase();

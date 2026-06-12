@@ -11,7 +11,6 @@ import { captureScreen } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import Breadcrumbs from '../components/Breadcrumbs';
 
-import { DASHBOARD_CARDS } from '../data/mockData';
 import DashboardScreen from '../Screens/DashboardScreen';
 import ApprovalScreen from '../Screens/ApprovalScreen';
 import { DrawerParamList } from './types';
@@ -19,31 +18,16 @@ import ViewDetailScreen from '../Screens/ViewDetailScreen';
 import ChatListScreen from '../Screens/ChatListScreen';
 import ChatDetailScreen from '../Screens/ChatDetailScreen';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
-import { fetchApprovalCounts } from '../redux/slices/dashboardSlice';
+import { fetchApprovalCounts, fetchDashboardCards } from '../redux/slices/dashboardSlice';
 import { logoutUser } from '../redux/slices/authSlice';
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
 type DrawerMenuItem = {
-  key: keyof DrawerParamList;
+  key: string;
   label: string;
   count: number;
   icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
-};
-
-type ModuleConfig = {
-  key: keyof DrawerParamList;
-  title: string;
-  subtitle: string;
-  routeSlug: string;
-  permissionColumn: string;
-};
-
-const routeMap: Record<string, keyof DrawerParamList> = {
-  'purchase-order': 'PurchaseOrder',
-  'work-order': 'WorkOrder',
-  'price-approval': 'PriceApproval',
-  'sales-return-approval': 'SalesReturn',
 };
 
 const iconMap: Record<string, DrawerMenuItem['icon']> = {
@@ -52,81 +36,37 @@ const iconMap: Record<string, DrawerMenuItem['icon']> = {
   LayoutDashboard,
 };
 
-const MODULE_CONFIGS: ModuleConfig[] = [
-  {
-    key: 'PurchaseOrder',
-    title: 'Purchase Order Approvals',
-    subtitle: 'Review purchase order requests and action pending entries',
-    routeSlug: 'purchase-order',
-    permissionColumn: 'poApproval',
-  },
-  {
-    key: 'WorkOrder',
-    title: 'Work Order Approvals',
-    subtitle: 'Validate and manage work order approval requests',
-    routeSlug: 'work-order',
-    permissionColumn: 'workOrderApproval',
-  },
-  {
-    key: 'PriceApproval',
-    title: 'Price Approvals',
-    subtitle: 'Approve pricing changes and commercial exceptions',
-    routeSlug: 'price-approval',
-    permissionColumn: 'priceApproval',
-  },
-  {
-    key: 'SalesReturn',
-    title: 'Sales Return Approvals',
-    subtitle: 'Process sales return authorization requests',
-    routeSlug: 'sales-return-approval',
-    permissionColumn: 'salesReturnApproval',
-  },
-];
-
 function SidebarContent(
   props: DrawerContentComponentProps & {
     onLogout: () => void;
-    allowedPermissions: string[];
+    allowedCards: any[];
     userName: string;
     counts: Record<string, number>;
   },
 ) {
-  const { navigation, state, onLogout, allowedPermissions, userName, counts } = props;
+  const { navigation, state, onLogout, allowedCards, userName, counts } = props;
   const insets = useSafeAreaInsets();
   const drawerStatus = useDrawerStatus();
   const isDrawerOpen = drawerStatus === 'open';
 
   React.useEffect(() => {
     if (Platform.OS !== 'android') return;
-
-    NavigationBar.setButtonStyleAsync(isDrawerOpen ? 'light' : 'dark').catch(() => {
-      // Older Android variants may not support dynamic nav button styles.
-    });
+    NavigationBar.setButtonStyleAsync(isDrawerOpen ? 'light' : 'dark').catch(() => {});
   }, [isDrawerOpen]);
 
-  const getPendingCount = (permissionColumn: string, routeSlug: string) => {
+  const getCount = (permissionColumn: string, routeSlug: string) => {
     const permissionCount = Number(counts?.[permissionColumn] ?? 0);
     const routeCount = Number(counts?.[routeSlug] ?? 0);
     return Math.max(permissionCount, routeCount);
   };
 
   const menuItems: DrawerMenuItem[] = [
-    {
-      key: 'Dashboard',
-      label: 'Dashboard',
-      count: 0,
-      icon: LayoutDashboard,
-    },
-    {
-      key: 'ChatList',
-      label: 'Messages',
-      count: 0,
-      icon: MessageSquare,
-    },
-    ...DASHBOARD_CARDS.filter((card) => allowedPermissions.includes(card.permissionColumn)).map((card) => ({
-      key: routeMap[card.routeSlug] || 'Dashboard',
+    { key: 'Dashboard', label: 'Dashboard', count: 0, icon: LayoutDashboard },
+    { key: 'ChatList', label: 'Messages', count: 0, icon: MessageSquare },
+    ...allowedCards.map((card: any) => ({
+      key: card.routeSlug,
       label: card.cardTitle,
-      count: getPendingCount(card.permissionColumn, card.routeSlug),
+      count: getCount(card.permissionColumn, card.routeSlug),
       icon: iconMap[card.iconKey] || LayoutDashboard,
     })),
   ];
@@ -140,7 +80,6 @@ function SidebarContent(
         scrollEnabled={false}
       >
         <View className="flex-1 px-3 py-4">
-          {/* HEADER */}
           <View className="mb-4 flex-row items-center justify-between">
             <View className="flex-row items-center">
               <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-white/20">
@@ -161,7 +100,6 @@ function SidebarContent(
 
           <View className="h-px bg-white/10 mb-4" />
 
-          {/* MENU ITEMS */}
           <View className="flex-1 gap-2">
             {menuItems.map((item) => {
               const index = state.routeNames.indexOf(item.key);
@@ -172,8 +110,8 @@ function SidebarContent(
                 <Pressable
                   key={item.key}
                   onPress={() => {
-                    if (item.key === 'Dashboard' || item.key === 'ChatList' || item.label === 'Messages') {
-                      navigation.navigate(item.key === 'ChatList' || item.label === 'Messages' ? 'ChatList' : 'Dashboard');
+                    if (item.key === 'Dashboard' || item.key === 'ChatList') {
+                      navigation.navigate(item.key as any);
                       return;
                     }
 
@@ -182,11 +120,10 @@ function SidebarContent(
                       return;
                     }
 
-                    const config = MODULE_CONFIGS.find((m) => m.key === item.key);
                     navigation.navigate(item.key as any, {
-                      title: config?.title || item.label,
-                      subtitle: config?.subtitle,
-                      routeSlug: config?.routeSlug,
+                      title: item.label,
+                      subtitle: 'Review pending requests',
+                      routeSlug: item.key,
                     });
                   }}
                   className={`flex-row items-center justify-between rounded-2xl px-4 py-4 ${focused ? 'bg-white/15' : 'bg-transparent'}`}
@@ -209,7 +146,6 @@ function SidebarContent(
 
           <View className="h-px bg-white/10 my-4" />
 
-          {/* LOGOUT */}
           <Pressable
             onPress={onLogout}
             className="flex-row items-center rounded-xl bg-red-500/10 px-3 py-3"
@@ -226,32 +162,30 @@ function SidebarContent(
 export default function AppDrawerNavigator() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const { counts } = useAppSelector((state) => state.dashboard);
+  const { counts, cards } = useAppSelector((state) => state.dashboard);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const permanent = width >= 1024;
   const userName = user?.name || 'User';
-  const allowedPermissions = user?.permissions || [];
+  const userPermissions = user?.permissions || [];
+
+  const allowedCards = useMemo(
+    () => (Array.isArray(cards) ? cards : []).filter((card: any) =>
+      userPermissions.includes(card.permissionColumn)
+    ),
+    [userPermissions, cards],
+  );
 
   useFocusEffect(
     useCallback(() => {
       dispatch(fetchApprovalCounts());
+      dispatch(fetchDashboardCards());
     }, [dispatch]),
-  );
-
-  const allowedModules = useMemo(
-    () => MODULE_CONFIGS.filter((item) => allowedPermissions.includes(item.permissionColumn)),
-    [allowedPermissions],
   );
 
   const handleScreenshot = async () => {
     try {
-      // Small delay to let the UI settle if needed
-      const uri = await captureScreen({
-        format: 'jpg',
-        quality: 0.8,
-      });
-
+      const uri = await captureScreen({ format: 'jpg', quality: 0.8 });
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
         await Sharing.shareAsync(uri, {
@@ -279,10 +213,8 @@ export default function AppDrawerNavigator() {
         >
           <SidebarContent
             {...props}
-            onLogout={() => {
-              dispatch(logoutUser());
-            }}
-            allowedPermissions={allowedPermissions}
+            onLogout={() => dispatch(logoutUser())}
+            allowedCards={allowedCards}
             userName={userName}
             counts={counts}
           />
@@ -294,7 +226,6 @@ export default function AppDrawerNavigator() {
           if (permanent) return null;
           return (
             <View className="bg-white border-b border-slate-100 shadow-sm" style={{ paddingTop: Math.max(insets.top, 10) }}>
-              {/* Top Row: Navigation, Logo, Profile */}
               <View className="flex-row items-center justify-between px-4 h-16">
                 <View className="flex-row items-center">
                   <Pressable
@@ -303,16 +234,13 @@ export default function AppDrawerNavigator() {
                   >
                     <Menu size={22} color="#475569" />
                   </Pressable>
-
                   <View className="h-10 w-px bg-slate-200 ml-1 mr-4" />
-
                   <Image
                     source={{ uri: 'https://visioninfotech.co.tz/assets/images/vit-logo-dark.png' }}
                     style={{ width: 140, height: 40 }}
                     resizeMode="contain"
                   />
                 </View>
-
                 <View className="flex-row items-center gap-3">
                   <Pressable
                     onPress={handleScreenshot}
@@ -320,16 +248,11 @@ export default function AppDrawerNavigator() {
                   >
                     <Camera size={18} color="#475569" />
                   </Pressable>
-                  {/* <Pressable className="h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
-                    <Bell size={18} color="#475569" />
-                  </Pressable> */}
                   <View className="h-9 w-9 items-center justify-center rounded-full bg-[#8E78FF] shadow-sm">
                     <Text className="text-sm font-black text-white">{(userName.charAt(0) || 'U').toUpperCase()}</Text>
                   </View>
                 </View>
               </View>
-
-              {/* Bottom Row: Breadcrumbs */}
               {route.name !== 'Dashboard' && (
                 <View className="border-t border-slate-100">
                   <Breadcrumbs />
@@ -339,25 +262,22 @@ export default function AppDrawerNavigator() {
           );
         },
         drawerType: permanent ? 'permanent' : 'front',
-        drawerStyle: {
-          width: 320,
-          backgroundColor: 'transparent',
-        },
+        drawerStyle: { width: 320, backgroundColor: 'transparent' },
         overlayColor: 'rgba(15,23,42,0.45)',
         sceneStyle: { backgroundColor: '#f8fafc' },
       }}
     >
       <Drawer.Screen name="Dashboard" component={DashboardScreen} />
-      {allowedModules.map((module) => (
+      {allowedCards.map((card: any) => (
         <Drawer.Screen
-          key={module.key}
-          name={module.key}
-          options={{ title: module.title }}
+          key={card.routeSlug}
+          name={card.routeSlug}
+          options={{ title: card.cardTitle }}
           component={ApprovalScreen}
           initialParams={{
-            title: module.title,
-            subtitle: module.subtitle,
-            routeSlug: module.routeSlug,
+            title: card.cardTitle,
+            subtitle: 'Review pending requests',
+            routeSlug: card.routeSlug,
           }}
         />
       ))}

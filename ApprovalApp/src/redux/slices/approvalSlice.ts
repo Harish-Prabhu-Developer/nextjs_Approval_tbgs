@@ -19,9 +19,11 @@ const initialState: ApprovalState = {
 
 export const fetchApprovalRecords = createAsyncThunk(
   "approval/fetchRecords",
-  async (approvalType: string, { rejectWithValue }) => {
+  async (approvalType: string, { rejectWithValue, getState }) => {
     try {
-      return await apiRequest<any[]>(`/api/approvals/${approvalType}`);
+      const state = getState() as any;
+      const token = state.auth?.token;
+      return await apiRequest<any[]>(`/api/approvals/${approvalType}`, { token });
     } catch (error: any) {
       return rejectWithValue(error?.message || "Failed to fetch records");
     }
@@ -30,9 +32,11 @@ export const fetchApprovalRecords = createAsyncThunk(
 
 export const fetchApprovalDetail = createAsyncThunk(
   "approval/fetchDetail",
-  async ({ type, id }: { type: string; id: string }, { rejectWithValue }) => {
+  async ({ type, id }: { type: string; id: string }, { rejectWithValue, getState }) => {
     try {
-      return await apiRequest<any>(`/api/approvals/${type}/${id}`);
+      const state = getState() as any;
+      const token = state.auth?.token;
+      return await apiRequest<any>(`/api/approvals/${type}/${id}`, { token });
     } catch (error: any) {
       return rejectWithValue(error?.message || "Failed to fetch detail");
     }
@@ -41,9 +45,11 @@ export const fetchApprovalDetail = createAsyncThunk(
 
 export const fetchConversation = createAsyncThunk(
   "approval/fetchConversation",
-  async (poRefNo: string, { rejectWithValue }) => {
+  async (poRefNo: string, { rejectWithValue, getState }) => {
     try {
-      return await apiRequest<any[]>(`/api/approvals/conversation?poRefNo=${encodeURIComponent(poRefNo)}`);
+      const state = getState() as any;
+      const token = state.auth?.token;
+      return await apiRequest<any[]>(`/api/approvals/conversation?poRefNo=${encodeURIComponent(poRefNo)}`, { token });
     } catch (error: any) {
       return rejectWithValue(error?.message || "Failed to fetch conversation");
     }
@@ -52,11 +58,14 @@ export const fetchConversation = createAsyncThunk(
 
 export const updateApprovalStatus = createAsyncThunk(
   "approval/updateStatus",
-  async (payload: any, { rejectWithValue }) => {
+  async (payload: { ids: number[]; status: string; remarks: string; approvalType: string }, { rejectWithValue, getState }) => {
     try {
-      return await apiRequest<any>("/api/approvals/status", {
-        method: "POST",
-        body: payload,
+      const state = getState() as any;
+      const token = state.auth?.token;
+      return await apiRequest<any>(`/api/approvals/${payload.approvalType}`, {
+        method: "PATCH",
+        body: { ids: payload.ids, status: payload.status, remarks: payload.remarks },
+        token,
       });
     } catch (error: any) {
       return rejectWithValue(error?.message || "Failed to update status");

@@ -31,23 +31,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DrawerParamList } from '../navigation/types';
-import {
-    MOCK_APPROVAL_DATA,
-    COMPANY_MASTER,
-    SUPPLIER_MASTER,
-    STORE_MASTER,
-} from '../data/mockData';
 import DataTable, { Column } from '../components/DataTable';
 import FilterForm from '../components/FilterForm';
 import PdfViewerModal from '../components/PdfViewerModal';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
-import { fetchApprovalRecords } from '../redux/slices/approvalSlice';
-import {
-    PURCHASE_ORDER_DTL,
-    PURCHASE_ORDER_FILES_UPLOAD,
-    PURCHASE_ORDER_ADDITIONAL_COST_DETAILS,
-    PRODUCT_MASTER,
-} from '../data/mockData';
+import { fetchApprovalRecords, updateApprovalStatus, fetchApprovalDetail } from '../redux/slices/approvalSlice';
 
 type ModuleNavProp = DrawerNavigationProp<DrawerParamList>;
 
@@ -426,11 +414,8 @@ export default function ApprovalScreen() {
     }, [dispatch, routeSlug]);
 
     const sourceData = useMemo(() => {
-        if (Array.isArray(records) && records.length > 0) {
-            return records;
-        }
-        return MOCK_APPROVAL_DATA[routeSlug] || [];
-    }, [records, routeSlug]);
+        return Array.isArray(records) ? records : [];
+    }, [records]);
 
     const effectiveLoading = isLoading || approvalLoading;
 
@@ -488,76 +473,90 @@ export default function ApprovalScreen() {
         setTimeout(() => setIsLoading(false), 600);
     };
 
-    const confirmStatusChange = () => {
+    const confirmStatusChange = async () => {
         if (!pendingStatusUpdate || !remarksInput.trim()) return;
         setIsLoading(true);
-        setTimeout(() => {
+        try {
+            const result = await dispatch(updateApprovalStatus({
+                ids: pendingStatusUpdate.ids,
+                status: pendingStatusUpdate.status,
+                remarks: remarksInput,
+                approvalType: routeSlug || 'purchase-order'
+            })).unwrap();
             Alert.alert("Action Successful", `${pendingStatusUpdate.ids.length} entries updated.`);
             setSelectedRows([]);
             setPendingStatusUpdate(null);
             setRemarksInput("");
             setIsRemarksModalOpen(false);
+        } catch (error: any) {
+            Alert.alert("Update Failed", error?.message || "Failed to update status");
+        } finally {
             setIsLoading(false);
-        }, 1000);
+        }
     };
 
-    const handleViewDocument = useCallback((row: any) => {
-        const matchingFiles = PURCHASE_ORDER_FILES_UPLOAD.filter(
-            (file: any) => file.poRefNo === row.poRefNo
-        );
+    const handleViewDocument = useCallback(async (row: any) => {
+        setIsLoading(true);
+        try {
+            const detail = await dispatch(fetchApprovalDetail({ type: routeSlug, id: String(row.sno || row.id) })).unwrap();
+            const matchingFiles = detail?.files || [];
 
-        if (matchingFiles.length === 0) {
-            Alert.alert("Not Found", `No document found for ${row.poRefNo}`);
-            return;
+            if (matchingFiles.length === 0) {
+                Alert.alert("Not Found", `No document found for ${row.poRefNo}`);
+                return;
+            }
+
+            const selectedFile = matchingFiles.find((file: any) => file.contentType === "application/pdf");
+
+            if (!selectedFile?.contentData) {
+                Alert.alert("Empty", `Document content is missing for ${row.poRefNo}`);
+                return;
+            }
+
+            setCurrentPdfData(selectedFile.contentData);
+            setCurrentPdfTitle(`Document - ${row.poRefNo}`);
+            setIsPdfModalOpen(true);
+        } catch (error) {
+            Alert.alert("Error", "Failed to fetch document");
+        } finally {
+            setIsLoading(false);
         }
-
-        const selectedFile = matchingFiles.find((file: any) => file.contentType === "application/pdf");
-
-        if (!selectedFile?.contentData) {
-            Alert.alert("Empty", `Document content is missing for ${row.poRefNo}`);
-            return;
-        }
-
-        setCurrentPdfData(selectedFile.contentData);
-        setCurrentPdfTitle(`Document - ${row.poRefNo}`);
-        setIsPdfModalOpen(true);
-    }, []);
+    }, [dispatch, routeSlug]);
 
     const handleGenerateInvoicePdf = useCallback(async (row: any) => {
         setIsLoading(true);
         try {
-            // ── Build template ──────────────────────────────────────
-            const lineItems = PURCHASE_ORDER_DTL
-                .filter((item: any) => item.poRefNo === row.poRefNo)
-                .map((item: any) => {
-                    const product = item.productId
-                        ? PRODUCT_MASTER.find((p: any) => p.productId === item.productId)
-                        : undefined;
-                    const qty = Number(item.totalPcs ?? item.totalPacking ?? 0);
-                    const unitPrice = Number(item.ratePerPcs ?? 0);
-                    const amount = Number(
-                        item.totalProductAmount ?? item.productAmount ??
-                        item.finalProductAmount ?? qty * unitPrice
-                    );
-                    return {
-                        ...item,
-                        productName: (product as any)?.productName || item.alternateProductName || `Product ${item.productId ?? ''}`.trim(),
-                        specification: (product as any)?.specification || item.remarks || '-',
-                        orderedQty: qty, unitPrice, amount
-                    };
-                });
+            // ── Fetch data from API instead of mock ──
+            const detail = await dispatch(fetchApprovalDetail({ type: routeSlug, id: String(row.sno || row.id) })).unwrap();
+            
+            const lineItems = (detail?.productLineItems || []).map((item: any) => {
+                const qty = Number(item.totalPcs ?? item.totalPacking ?? item.orderedQty ?? 0);
+                const unitPrice = Number(item.ratePerPcs ?? item.unitPrice ?? 0);
+                const amount = Number(
+                    item.totalProductAmount ?? item.productAmount ??
+                    item.finalProductAmount ?? item.amount ?? (qty * unitPrice)
+                );
+                return {
+                    ...item,
+                    productName: item.productName || item.alternateProductName || `Product ${item.productId ?? ''}`.trim(),
+                    specification: item.specification || item.remarks || '-',
+                    orderedQty: qty,
+                    unitPrice,
+                    amount
+                };
+            });
 
-            const additionalCosts = PURCHASE_ORDER_ADDITIONAL_COST_DETAILS
-                .filter((cost: any) => cost.poRefNo === row.poRefNo && cost.statusMaster === 'ACTIVE')
+            const additionalCosts = (detail?.additionalCosts || [])
+                .filter((cost: any) => cost.statusMaster === 'ACTIVE')
                 .map((cost: any) => ({
                     ...cost,
                     costType: cost.additionalCostType || 'ADDITIONAL_COST',
                     vatAmount: Number(cost.vatAmount ?? 0)
                 }));
 
-            const supplier = (SUPPLIER_MASTER.find((s: any) => s.supplierId === row.supplierId) || {}) as any;
-            const company = (COMPANY_MASTER.find((c: any) => c.companyId === row.companyId) || {}) as any;
-            const store = (STORE_MASTER.find((s: any) => s.storeId === row.poStoreId) || {}) as any;
+            const supplier = detail?.supplier || {};
+            const company = detail?.company || {};
+            const store = detail?.store || {};
 
             const subtotal = lineItems.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
             const addCostTotal = additionalCosts.reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
@@ -895,7 +894,7 @@ export default function ApprovalScreen() {
     ], [navigation, routeSlug, handleViewDocument, handleGenerateInvoicePdf]);
 
     const expandedColumns: Column[] = useMemo(() => [
-        { key: 'poStoreId', label: 'Dept', render: (val) => STORE_MASTER.find(s => s.storeId === val)?.storeName || val },
+        { key: 'poStoreId', label: 'Dept', render: (val, row: any) => row.storeName || val },
         { key: 'poDate', label: 'PO Date' },
     ], []);
 

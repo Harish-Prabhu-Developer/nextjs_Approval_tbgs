@@ -11,36 +11,19 @@ export async function POST(request: Request) {
         const { username, password, fcmToken } = await request.json();
 
         // In a real app, you'd verify against DB
-        // For now, if DB is empty, we can mock a successful login for 'admin'
-        
         let user = null;
-        try {
-            const dbUsers = await db.select().from(users).where(eq(users.username, username));
-            if (dbUsers.length > 0 && dbUsers[0].password === password) {
-                user = dbUsers[0];
-                
-                // Update FCM token if provided
-                if (fcmToken) {
-                    await db.update(users)
-                        .set({ fcmToken })
-                        .where(eq(users.id, user.id));
-                    user.fcmToken = fcmToken;
-                }
-            }
-        } catch (e) {
-            console.error("DB Login failed, falling back to mock", e);
-        }
 
-        // Fallback mock user if DB fails or is empty
-        if (!user && username === 'admin' && password === 'password123') {
-            user = {
-                id: 1,
-                username: 'admin',
-                name: 'Administrator',
-                role: 'admin',
-                email: 'admin@tbgs.co.tz',
-                permissions: ["poApproval", "workOrderApproval", "priceApproval", "salesReturnApproval"]
-            };
+        const dbUsers = await db.select().from(users).where(eq(users.username, username));
+        if (dbUsers.length > 0 && dbUsers[0].password === password) {
+            user = dbUsers[0];
+            
+            // Update FCM token if provided
+            if (fcmToken) {
+                await db.update(users)
+                    .set({ fcmToken })
+                    .where(eq(users.id, user.id));
+                user.fcmToken = fcmToken;
+            }
         }
 
         if (!user) {
