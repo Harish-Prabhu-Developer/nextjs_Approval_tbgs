@@ -38,7 +38,8 @@ export const dashboardCards = pgTable("tbl_dashboard_cards", {
   routeSlug: varchar("route_slug", { length: 64 }).notNull(),
   approvalType: varchar("approval_type", { length: 64 }).notNull(),
   iconKey: varchar("icon_key", { length: 64 }).notNull(),
-  backgroundColor: varchar("background_color", { length: 32 }).notNull()
+  backgroundColor: varchar("background_color", { length: 32 }).notNull(),
+  parentId: integer("parent_id").references((): any => dashboardCards.sno)
 });
 
 // -------------------- Masters --------------------

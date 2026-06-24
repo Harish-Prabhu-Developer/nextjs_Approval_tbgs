@@ -69,7 +69,7 @@ export async function POST(request: Request) {
             supplierId: supplierId ? Number(supplierId) : null,
             poStoreId: poStoreId ? Number(poStoreId) : null,
             remarks,
-            currencyType: currencyType || 'USD',
+            currencyType: currencyType || 'TZS',
             statusEntry: statusEntry || 'PENDING',
             finalResponseStatus: statusEntry || 'PENDING',
             totalFinalProductionHdrAmount: totalAmount || 0,

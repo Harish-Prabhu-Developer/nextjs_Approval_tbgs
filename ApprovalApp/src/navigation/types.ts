@@ -6,6 +6,7 @@ export type RootStackParamList = {
 
 export type DrawerParamList = {
   Dashboard: undefined;
+  SubModule: { parentId: number; title: string };
   ViewDetail: { id: any; approvalType: string; item: any };
   ChatList: undefined;
   ChatDetail: { userId: number; name: string };

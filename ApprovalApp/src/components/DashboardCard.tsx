@@ -1,6 +1,23 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { BriefcaseBusiness, LayoutDashboard, ShoppingCart } from 'lucide-react-native';
+import {
+  BriefcaseBusiness,
+  LayoutDashboard,
+  ShoppingCart,
+  FileText,
+  Bookmark,
+  DollarSign,
+  Users,
+  Package,
+  Truck,
+  BookOpen,
+  User,
+  Zap,
+  Database,
+  Building2,
+  TrendingUp,
+  RotateCcw,
+} from 'lucide-react-native';
 
 type CardInput = {
   id: number;
@@ -19,6 +36,19 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; color?: strin
   ShoppingCart,
   Briefcase: BriefcaseBusiness,
   LayoutDashboard,
+  FileText,
+  Bookmark,
+  DollarSign,
+  Users,
+  Package,
+  Truck,
+  Book: BookOpen,
+  User,
+  Zap,
+  Database,
+  Building2,
+  TrendingUp,
+  RotateCcw,
 };
 
 const bgColorMap: Record<string, { wrapper: string; icon: string }> = {

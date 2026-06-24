@@ -14,10 +14,15 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.visioninfotech.tbgs"
+      "bundleIdentifier": "com.visioninfotech.tbgs",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.visioninfotech.tbgs",
+      "versionCode": 1,
       "permissions": [
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
@@ -33,7 +38,10 @@
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json"
     },
-    "plugins": ["expo-file-system", "expo-notifications"],
+    "plugins": [
+      "expo-file-system",
+      "expo-notifications"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },

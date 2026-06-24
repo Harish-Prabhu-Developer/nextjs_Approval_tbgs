@@ -10,12 +10,18 @@ import {
     Settings,
     FileText,
     MessageSquareMore,
-    Loader2
+    Loader2,
+    Truck,
+    Building2,
+    Users,
+    Package,
+    Map
 } from "lucide-react";
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppDispatch } from '@/redux/hooks';
 import { fetchDashboardCards } from '@/redux/slices/dashboardSlice';
+import { useRouter } from 'next/navigation';
 import FilterForm from '../../components/ApprovalDetails/FilterForm';
 import DataTable, { Column } from '../../components/ApprovalDetails/DataTable';
 import ExpandableText from '../../components/ExpandableText';
@@ -68,7 +74,18 @@ type PendingStatusUpdate = {
 
 const ApprovalsManagementPage = () => {
     const dispatch = useAppDispatch();
+    const router = useRouter();
     const [approvals, setApprovals] = useState<any[]>([]);
+
+    const MANAGEMENT_TABS = [
+        { key: 'manage', label: 'Approval Cards', icon: Icons.LayoutDashboard },
+        { key: 'request', label: 'Requests', icon: Icons.FileText },
+        { key: 'suppliers', label: 'Suppliers', icon: Icons.Building2 },
+        { key: 'trucks', label: 'Trucks', icon: Icons.Truck },
+        { key: 'trailers', label: 'Trailers', icon: Icons.Map },
+        { key: 'companies', label: 'Companies', icon: Icons.Building2 },
+        { key: 'products', label: 'Products', icon: Icons.Package },
+    ];
     const [requests, setRequests] = useState<any[]>([]);
     const [companies, setCompanies] = useState<any[]>([]);
     const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -108,7 +125,8 @@ const ApprovalsManagementPage = () => {
         routeSlug: '',
         approvalType: '',
         iconKey: 'LayoutDashboard',
-        backgroundColor: 'indigo'
+        backgroundColor: 'indigo',
+        parentId: ''
     });
 
     const emptyLineItem = () => ({
@@ -217,11 +235,12 @@ const ApprovalsManagementPage = () => {
                 routeSlug: approval.routeSlug,
                 approvalType: approval.approvalType,
                 iconKey: approval.iconKey || 'LayoutDashboard',
-                backgroundColor: approval.backgroundColor || 'indigo'
+                backgroundColor: approval.backgroundColor || 'indigo',
+                parentId: approval.parentId ? String(approval.parentId) : ''
             });
         } else {
             setCurrentApproval(null);
-            setFormData({ cardTitle: '', permissionColumn: '', routeSlug: '', approvalType: '', iconKey: 'LayoutDashboard', backgroundColor: 'indigo' });
+            setFormData({ cardTitle: '', permissionColumn: '', routeSlug: '', approvalType: '', iconKey: 'LayoutDashboard', backgroundColor: 'indigo', parentId: '' });
         }
         setIsModalOpen(true);
     };
@@ -241,7 +260,11 @@ const ApprovalsManagementPage = () => {
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...formData, sno: currentApproval?.sno })
+                body: JSON.stringify({
+                    ...formData,
+                    sno: currentApproval?.sno,
+                    parentId: formData.parentId ? Number(formData.parentId) : null
+                })
             });
             if (response.ok) {
                 toast.success(currentApproval ? 'Approval updated' : 'Approval created');
@@ -498,7 +521,7 @@ const ApprovalsManagementPage = () => {
             doc.text(`Date: ${row.poDate ? new Date(row.poDate).toLocaleDateString() : "-"}`, margin, 26);
             doc.text(`Type: ${row.approvalType || "-"}`, margin, 31);
             doc.text(`Requested By: ${row.requestedBy || "-"}`, margin, 36);
-            doc.text(`Total: ${row.currencyType || ""} ${Number(row.totalFinalProductionHdrAmount || 0).toLocaleString()}`, margin, 41);
+            doc.text(`Total: ${row.currencyType || "TZS"} ${Number(row.totalFinalProductionHdrAmount || 0).toLocaleString()}`, margin, 41);
 
             autoTable(doc, {
                 startY: 48,
@@ -510,8 +533,8 @@ const ApprovalsManagementPage = () => {
                     ["Supplier", getSupplierName(row.supplierId) || "-"],
                     ["Department", getStoreName(row.poStoreId) || "-"],
                     ["Purchase Type", row.purchaseType || "-"],
-                    ["Currency", row.currencyType || "-"],
-                    ["Amount", `${row.currencyType || ""} ${Number(row.totalFinalProductionHdrAmount || 0).toLocaleString()}`],
+                    ["Currency", row.currencyType || "TZS"],
+                    ["Amount", `${row.currencyType || "TZS"} ${Number(row.totalFinalProductionHdrAmount || 0).toLocaleString()}`],
                     ["Status", row.finalResponseStatus || row.statusEntry || "PENDING"],
                     ["Remarks", row.remarks || "-"]
                 ],
@@ -775,27 +798,31 @@ const ApprovalsManagementPage = () => {
                 </div>
             </div>
 
-            <div className="flex space-x-1 bg-white p-1 rounded-2xl border border-slate-200 w-fit">
-                <button
-                    onClick={() => setActiveTab('manage')}
-                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                        activeTab === 'manage'
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
-                        : 'text-slate-500 hover:bg-slate-50'
-                    }`}
-                >
-                    Manage Approval Cards
-                </button>
-                <button
-                    onClick={() => setActiveTab('request')}
-                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                        activeTab === 'request'
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
-                        : 'text-slate-500 hover:bg-slate-50'
-                    }`}
-                >
-                    Manage Approval Requests
-                </button>
+            <div className="flex flex-wrap gap-1 bg-white p-1 rounded-2xl border border-slate-200">
+                {MANAGEMENT_TABS.map(tab => {
+                    const TabIcon = tab.icon;
+                    const isExternal = ['suppliers', 'trucks', 'trailers', 'companies', 'products'].includes(tab.key);
+                    return (
+                        <button
+                            key={tab.key}
+                            onClick={() => {
+                                if (isExternal) {
+                                    router.push(`/admin/${tab.key}`);
+                                } else {
+                                    setActiveTab(tab.key);
+                                }
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                activeTab === tab.key && !isExternal
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
+                                : 'text-slate-500 hover:bg-slate-50'
+                            }`}
+                        >
+                            <TabIcon size={15} />
+                            {tab.label}
+                        </button>
+                    );
+                })}
             </div>
 
             {activeTab === 'manage' ? (
@@ -815,13 +842,34 @@ const ApprovalsManagementPage = () => {
                         Array.from({ length: 3 }).map((_, i) => (
                             <div key={i} className="h-full min-h-[220px] bg-white border border-slate-100 rounded-3xl animate-pulse" />
                         ))
-                    ) : approvals.map(app => {
+                    ) : (() => {
+                        const parentMap: Record<number, any> = {};
+                        const childCountMap: Record<number, number> = {};
+                        approvals.forEach(a => {
+                            if (a.parentId) parentMap[a.sno] = approvals.find((p: any) => p.sno === a.parentId);
+                            if (a.parentId) childCountMap[a.parentId] = (childCountMap[a.parentId] || 0) + 1;
+                        });
+
+                        const sorted = [...approvals].sort((a, b) => {
+                            if (a.parentId && !b.parentId) return 1;
+                            if (!a.parentId && b.parentId) return -1;
+                            return a.sno - b.sno;
+                        });
+
+                        return sorted.map((app: any) => {
                         const Icon = iconMap[app.iconKey] || Icons.LayoutDashboard;
-                        const theme = THEME_MAP.find(t => t.id === app.backgroundColor) || THEME_MAP[0];
+                        const theme = THEME_MAP.find((t: any) => t.id === app.backgroundColor) || THEME_MAP[0];
                         const bgColor = `${theme.bg} ${theme.text} ${theme.border}`;
+                        const parent = app.parentId ? approvals.find((p: any) => p.sno === app.parentId) : null;
+                        const childCount = childCountMap[app.sno] || 0;
 
                         return (
-                            <div key={app.sno} className="group relative bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 p-6 transition-all hover:-translate-y-1">
+                            <div key={app.sno} className={`group relative bg-white rounded-3xl border shadow-sm hover:shadow-xl hover:shadow-slate-200/50 p-6 transition-all hover:-translate-y-1 ${app.parentId ? 'border-l-4 border-l-indigo-300 border-slate-100 ml-4' : 'border-slate-100'}`}>
+                                {app.parentId && (
+                                    <div className="absolute -top-2 left-4 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-black rounded-full uppercase tracking-wider">
+                                        Sub of {parent?.cardTitle || 'Unknown'}
+                                    </div>
+                                )}
                                 <div className={`w-12 h-12 rounded-2xl mb-4 flex items-center justify-center border ${bgColor}`}>
                                     <Icon size={24} />
                                 </div>
@@ -829,6 +877,11 @@ const ApprovalsManagementPage = () => {
                                 <p className="text-xs text-slate-400 font-medium mb-4">{app.permissionColumn}</p>
                                 <div className="flex items-center space-x-2 pt-4 border-t border-slate-50">
                                     <span className="text-[10px] font-black uppercase tracking-tight text-slate-300">Route: /{app.routeSlug}</span>
+                                    {childCount > 0 && (
+                                        <span className="ml-auto px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-black rounded-full">
+                                            {childCount} sub
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
                                     <button
@@ -846,7 +899,8 @@ const ApprovalsManagementPage = () => {
                                 </div>
                             </div>
                         );
-                    })}
+                        });
+                    })()}
                 </div>
             ) : (
                 <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-500">
@@ -1141,8 +1195,26 @@ const ApprovalsManagementPage = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Internal Type</label>
-                                        <input required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-medium" placeholder="purchase-order" value={formData.approvalType} onChange={e => setFormData({ ...formData, approvalType: e.target.value })} />
+                                        <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Linked Approval Type</label>
+                                        <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
+                                            value={formData.approvalType} onChange={e => setFormData({ ...formData, approvalType: e.target.value })}>
+                                            <option value="">— Select an approval type —</option>
+                                            {Array.from(new Set(approvals.map(a => a.approvalType))).map(type => (
+                                                <option key={type} value={type}>{type}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Parent Card</label>
+                                        <select className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
+                                            value={formData.parentId} onChange={e => setFormData({ ...formData, parentId: e.target.value })}>
+                                            <option value="">— None (Top-level card) —</option>
+                                            {approvals
+                                                .filter(a => a.sno !== currentApproval?.sno)
+                                                .map(a => (
+                                                    <option key={a.sno} value={a.sno}>{a.cardTitle} ({a.routeSlug})</option>
+                                                ))}
+                                        </select>
                                     </div>
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">

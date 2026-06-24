@@ -1,5 +1,5 @@
 {
-  "id": "d75a8471-e8f5-48f8-9d37-03d87bb8e29e",
+  "id": "32ff21a8-e27f-4a80-a714-f40b25fd8e1e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -580,10 +580,30 @@
           "type": "varchar(32)",
           "primaryKey": false,
           "notNull": true
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "tbl_dashboard_cards_parent_id_tbl_dashboard_cards_sno_fk": {
+          "name": "tbl_dashboard_cards_parent_id_tbl_dashboard_cards_sno_fk",
+          "tableFrom": "tbl_dashboard_cards",
+          "tableTo": "tbl_dashboard_cards",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "sno"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -1987,9 +2007,11 @@
         },
         "role": {
           "name": "role",
-          "type": "varchar(64)",
+          "type": "user_role",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'user'"
         },
         "email": {
           "name": "email",
@@ -2009,6 +2031,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": true
+        },
+        "fcm_token": {
+          "name": "fcm_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2034,7 +2062,16 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.user_role": {
+      "name": "user_role",
+      "schema": "public",
+      "values": [
+        "admin",
+        "user"
+      ]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

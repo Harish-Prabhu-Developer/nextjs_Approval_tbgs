@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { db } from "./index";
 import * as schema from "./schema";
 import { 
@@ -85,6 +86,48 @@ async function main() {
       approvalType: card.routeSlug
     }))
   );
+
+  // 2b. Sub-approvals: Employee module with children
+  console.log("Seeding sub-approval cards...");
+  await db.insert(schema.dashboardCards).values([
+    {
+      sno: 5,
+      cardTitle: "Employee Approvals",
+      permissionColumn: "employeeApproval",
+      routeSlug: "employee-approvals",
+      approvalType: "employee-approvals",
+      iconKey: "Users",
+      backgroundColor: "purple",
+      parentId: null,
+    },
+    {
+      sno: 6,
+      cardTitle: "Leave Approvals",
+      permissionColumn: "leaveApproval",
+      routeSlug: "leave-approval",
+      approvalType: "leave-approval",
+      iconKey: "Bookmark",
+      backgroundColor: "sky",
+      parentId: 5,
+    },
+    {
+      sno: 7,
+      cardTitle: "Salary Approvals",
+      permissionColumn: "salaryApproval",
+      routeSlug: "salary-approval",
+      approvalType: "salary-approval",
+      iconKey: "DollarSign",
+      backgroundColor: "emerald",
+      parentId: 5,
+    },
+  ]);
+
+  // Update admin user permissions to include new approval types
+  await db.update(schema.users)
+    .set({
+      permissions: ["priceApproval", "poApproval", "workOrderApproval", "salesReturnApproval", "employeeApproval", "leaveApproval", "salaryApproval"]
+    })
+    .where(eq(schema.users.id, 4));
 
   // 3. Companies
   console.log("Seeding companies...");

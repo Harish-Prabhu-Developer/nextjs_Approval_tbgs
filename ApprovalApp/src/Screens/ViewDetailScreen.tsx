@@ -195,8 +195,8 @@ export default function ViewDetailScreen() {
                         <InfoRow label="Cell" value={item?.cell || 'A1'} />
                         <InfoRow label="Company" value={companyName} />
                         <InfoRow label="Department" value={deptName} />
-                        <InfoRow label="Currency" value={item?.currencyType || 'N/A'} />
-                        <InfoRow label="PO Amount" value={`${Number(item?.totalFinalProductionHdrAmount || 0).toLocaleString()} ${item?.currencyType || ''}`} />
+                        <InfoRow label="Currency" value={item?.currencyType || 'TZS'} />
+                        <InfoRow label="PO Amount" value={`${Number(item?.totalFinalProductionHdrAmount || 0).toLocaleString()} ${item?.currencyType || 'TZS'}`} />
                         <InfoRow label="Pending Days" value="0 days" isLast />
                     </View>
                 </View>

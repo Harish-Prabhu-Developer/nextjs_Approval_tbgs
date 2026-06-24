@@ -361,7 +361,7 @@ const buildInvoicePdfBinary = (params: {
         ["Subtotal", fmt(totals.subtotal)],
         ["Additional Costs", fmt(totals.additionalCosts)],
         ["VAT", fmt(totals.vat)],
-        ["Total", `${fmt(totals.total)} ${row.currencyType || ""}`.trim()],
+        ["Total", `${fmt(totals.total)} ${row.currencyType || "TZS"}`.trim()],
     ];
     const totalsTop = Math.max(y + 70, bottomSafe + 90);
     totalsRows.forEach((entry, idx) => {
@@ -411,6 +411,7 @@ export default function ApprovalScreen() {
 
     useEffect(() => {
         dispatch(fetchApprovalRecords(routeSlug));
+        console.log("approval records", records);
     }, [dispatch, routeSlug]);
 
     const sourceData = useMemo(() => {
@@ -528,7 +529,7 @@ export default function ApprovalScreen() {
         try {
             // ── Fetch data from API instead of mock ──
             const detail = await dispatch(fetchApprovalDetail({ type: routeSlug, id: String(row.sno || row.id) })).unwrap();
-            
+
             const lineItems = (detail?.productLineItems || []).map((item: any) => {
                 const qty = Number(item.totalPcs ?? item.totalPacking ?? item.orderedQty ?? 0);
                 const unitPrice = Number(item.ratePerPcs ?? item.unitPrice ?? 0);
@@ -564,8 +565,13 @@ export default function ApprovalScreen() {
             const total = Number(row.totalFinalProductionHdrAmount ?? subtotal + addCostTotal + vat);
 
             const fmt = (v: any) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const poRef = row.poRefNo || '-';
-            const poDate = String(row.poDate || row.createdDate || '').split(' ')[0] || '-';
+            const poRef = row.poRefNo || row.refNo || row.requestRefNo || '-';
+            const poDate = String(row.poDate || row.createdDate || '').split('T')[0] || '-';
+
+            // ── Dynamic invoice title from routeSlug ─────────────────
+            const invoiceTitle = (routeSlug || 'approval')
+                .replace(/-/g, ' ')
+                .replace(/\b\w/g, (c: string) => c.toUpperCase());
 
             // ── QR Code ─────────────────────────────────────────────
             const baseUrl = process.env.EXPO_PUBLIC_BASE_URL || 'http://localhost:3000';
@@ -681,11 +687,11 @@ export default function ApprovalScreen() {
   <!-- Header -->
   <div class="header">
     <div class="header-left">
-      <h1>PURCHASE INVOICE</h1>
-      <p>Official Purchase Order Document</p>
+      <h1>${invoiceTitle.toUpperCase()}</h1>
+      <p>Official ${invoiceTitle} Document</p>
       <div style="margin-top:14px;" class="header-meta">
-        <div><strong>PO Ref:</strong> ${poRef}</div>
-        <div><strong>PO Date:</strong> ${poDate}</div>
+        <div><strong>Ref:</strong> ${poRef}</div>
+        <div><strong>Date:</strong> ${poDate}</div>
         <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
         <div><strong>Currency:</strong> ${row.currencyType || 'TZS'}</div>
       </div>
@@ -748,10 +754,10 @@ export default function ApprovalScreen() {
   <!-- Totals -->
   <div class="totals">
     <div class="totals-box">
-      <div class="totals-row"><span class="t-label">Subtotal</span><span class="t-value">${fmt(subtotal)} ${row.currencyType || ''}</span></div>
-      <div class="totals-row"><span class="t-label">Additional Costs</span><span class="t-value">${fmt(addCostTotal)} ${row.currencyType || ''}</span></div>
-      <div class="totals-row"><span class="t-label">VAT</span><span class="t-value">${fmt(vat)} ${row.currencyType || ''}</span></div>
-      <div class="totals-row"><span class="t-label">GRAND TOTAL</span><span class="t-value">${fmt(total)} ${row.currencyType || ''}</span></div>
+      <div class="totals-row"><span class="t-label">Subtotal</span><span class="t-value">${fmt(subtotal)} ${row.currencyType || 'TZS'}</span></div>
+      <div class="totals-row"><span class="t-label">Additional Costs</span><span class="t-value">${fmt(addCostTotal)} ${row.currencyType || 'TZS'}</span></div>
+      <div class="totals-row"><span class="t-label">VAT</span><span class="t-value">${fmt(vat)} ${row.currencyType || 'TZS'}</span></div>
+      <div class="totals-row"><span class="t-label">GRAND TOTAL</span><span class="t-value">${fmt(total)} ${row.currencyType || 'TZS'}</span></div>
     </div>
   </div>
 
@@ -873,8 +879,9 @@ export default function ApprovalScreen() {
             key: 'pendingDays',
             label: 'Pending Days',
             render: (_, row) => {
-                // Mock calculation for pending days
-                const days = Math.floor(Math.random() * 50) + 750;
+                const poDate = new Date(row.poDate || row.createdDate || Date.now());
+                const diffTime = Math.abs(new Date().getTime() - poDate.getTime());
+                const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                 return (
                     <View className="bg-orange-100 px-2 py-1 rounded-md border border-orange-200">
                         <Text className="text-[12px] font-black text-orange-700">{days}</Text>

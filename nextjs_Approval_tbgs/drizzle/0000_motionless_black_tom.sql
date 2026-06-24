@@ -1,3 +1,4 @@
+CREATE TYPE "public"."user_role" AS ENUM('admin', 'user');--> statement-breakpoint
 CREATE TABLE "tbl_approval_details" (
 	"sno" integer PRIMARY KEY NOT NULL,
 	"ref_no" varchar(50) NOT NULL,
@@ -83,7 +84,8 @@ CREATE TABLE "tbl_dashboard_cards" (
 	"route_slug" varchar(64) NOT NULL,
 	"approval_type" varchar(64) NOT NULL,
 	"icon_key" varchar(64) NOT NULL,
-	"background_color" varchar(32) NOT NULL
+	"background_color" varchar(32) NOT NULL,
+	"parent_id" integer
 );
 --> statement-breakpoint
 CREATE TABLE "tbl_main_categories" (
@@ -298,10 +300,11 @@ CREATE TABLE "tbl_users" (
 	"username" varchar(64) NOT NULL,
 	"password" varchar(128) NOT NULL,
 	"name" varchar(128) NOT NULL,
-	"role" varchar(64) NOT NULL,
+	"role" "user_role" DEFAULT 'user' NOT NULL,
 	"email" varchar(128) NOT NULL,
 	"permissions" text[] NOT NULL,
 	"is_active" boolean DEFAULT true,
+	"fcm_token" text,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
 );
@@ -312,6 +315,7 @@ ALTER TABLE "tbl_approval_requests" ADD CONSTRAINT "tbl_approval_requests_suppli
 ALTER TABLE "tbl_approval_requests" ADD CONSTRAINT "tbl_approval_requests_po_store_id_tbl_stores_store_id_fk" FOREIGN KEY ("po_store_id") REFERENCES "public"."tbl_stores"("store_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tbl_chat_messages" ADD CONSTRAINT "tbl_chat_messages_sender_id_tbl_users_id_fk" FOREIGN KEY ("sender_id") REFERENCES "public"."tbl_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tbl_chat_messages" ADD CONSTRAINT "tbl_chat_messages_receiver_id_tbl_users_id_fk" FOREIGN KEY ("receiver_id") REFERENCES "public"."tbl_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tbl_dashboard_cards" ADD CONSTRAINT "tbl_dashboard_cards_parent_id_tbl_dashboard_cards_sno_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."tbl_dashboard_cards"("sno") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tbl_products" ADD CONSTRAINT "tbl_products_main_category_id_tbl_main_categories_main_category_id_fk" FOREIGN KEY ("main_category_id") REFERENCES "public"."tbl_main_categories"("main_category_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tbl_products" ADD CONSTRAINT "tbl_products_sub_category_id_tbl_sub_categories_sub_category_id_fk" FOREIGN KEY ("sub_category_id") REFERENCES "public"."tbl_sub_categories"("sub_category_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tbl_purchase_order_dtl" ADD CONSTRAINT "tbl_purchase_order_dtl_request_store_id_tbl_stores_store_id_fk" FOREIGN KEY ("request_store_id") REFERENCES "public"."tbl_stores"("store_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

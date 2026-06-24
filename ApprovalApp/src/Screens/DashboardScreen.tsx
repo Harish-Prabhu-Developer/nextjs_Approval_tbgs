@@ -20,16 +20,42 @@ export default function DashboardScreen() {
   const { counts, cards, loading } = useAppSelector((state) => state.dashboard);
   const [refreshing, setRefreshing] = useState(false);
 
-  const allowedCards = useMemo(
-    () => (Array.isArray(cards) ? cards : []).filter((card: any) =>
-      user?.permissions?.includes(card.permissionColumn)
-    ),
-    [user, cards],
+  const allCards = useMemo(
+    () => (Array.isArray(cards) ? cards : []),
+    [cards],
   );
+
+  const topLevelCards = useMemo(
+    () => allCards.filter((card: any) =>
+      card.parentId == null && (
+        user?.role?.toLowerCase() === 'admin' || user?.permissions?.includes(card.permissionColumn)
+      )
+    ),
+    [allCards, user],
+  );
+
+  const childCardsMap = useMemo(() => {
+    const map: Record<number, any[]> = {};
+    for (const card of allCards) {
+      if (card.parentId != null) {
+        if (!map[card.parentId]) map[card.parentId] = [];
+        map[card.parentId].push(card);
+      }
+    }
+    return map;
+  }, [allCards]);
 
   const displayName = user?.name || "User";
 
   const getCount = (card: any) => {
+    const children = childCardsMap[card.sno];
+    if (children?.length) {
+      return children.reduce((sum, child) => {
+        const permissionCount = Number(counts?.[child.permissionColumn] ?? 0);
+        const routeCount = Number(counts?.[child.routeSlug] ?? 0);
+        return sum + Math.max(permissionCount, routeCount);
+      }, 0);
+    }
     const permissionCount = Number(counts?.[card.permissionColumn] ?? 0);
     const routeCount = Number(counts?.[card.routeSlug] ?? 0);
     return Math.max(permissionCount, routeCount);
@@ -39,6 +65,9 @@ export default function DashboardScreen() {
     useCallback(() => {
       dispatch(fetchApprovalCounts());
       dispatch(fetchDashboardCards());
+      console.log("dashboard screen user", user);
+      console.log("dashboard screen counts", counts);
+      console.log("dashboard screen cards", cards);
     }, [dispatch]),
   );
 
@@ -73,7 +102,7 @@ export default function DashboardScreen() {
         </Pressable>
       </View>
       <ScrollView className="flex-1 bg-[#f0f0f0]" contentContainerStyle={{ paddingBottom: insets.bottom }}>
-        {allowedCards.length === 0 ? (
+        {topLevelCards.length === 0 ? (
           <View className="rounded-2xl border border-slate-200 bg-white p-6">
             <Text className="text-center text-base font-bold text-slate-700">No Cards Available</Text>
             <Text className="mt-1 text-center text-sm font-medium text-slate-500">
@@ -82,8 +111,10 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <View className="flex-row flex-wrap justify-between">
-            {allowedCards.map((card: any) => {
+            {topLevelCards.map((card: any) => {
               const count = getCount(card);
+              const children = childCardsMap[card.sno];
+              const isParent = children?.length > 0;
 
               return (
                 <DashboardCard
@@ -96,7 +127,12 @@ export default function DashboardScreen() {
                     backgroundColor: card.backgroundColor,
                   }}
                   onPress={() => {
-                    if (count > 0) {
+                    if (isParent) {
+                      navigation.navigate('SubModule' as any, {
+                        parentId: card.sno,
+                        title: card.cardTitle,
+                      } as any);
+                    } else if (count > 0) {
                       navigation.navigate(card.routeSlug as any, {
                         title: card.cardTitle,
                         subtitle: "Review pending requests",

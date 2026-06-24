@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { cardTitle, permissionColumn, routeSlug, approvalType, iconKey, backgroundColor } = body;
+        const { cardTitle, permissionColumn, routeSlug, approvalType, iconKey, backgroundColor, parentId } = body;
 
         const newCard = await db.insert(dashboardCards).values({
             sno: body.sno || Math.floor(Math.random() * 1000000),
@@ -26,6 +26,7 @@ export async function POST(request: Request) {
             approvalType,
             iconKey,
             backgroundColor: backgroundColor || 'indigo',
+            parentId: parentId || null,
         }).returning();
 
         return NextResponse.json(newCard[0]);

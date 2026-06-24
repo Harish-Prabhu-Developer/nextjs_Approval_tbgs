@@ -5,13 +5,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
-import { Bell, BriefcaseBusiness, Camera, LayoutDashboard, LogOut, Menu, MessageSquare, ShoppingCart, X } from 'lucide-react-native';
+import { Bell, BriefcaseBusiness, Camera, ChevronDown, ChevronRight, LayoutDashboard, LogOut, Menu, MessageSquare, ShoppingCart, X, FileText, Bookmark, DollarSign, Users, Package, Truck, BookOpen, User, Zap, Database, Building2, TrendingUp, RotateCcw } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureScreen } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import Breadcrumbs from '../components/Breadcrumbs';
 
 import DashboardScreen from '../Screens/DashboardScreen';
+import SubModuleScreen from '../Screens/SubModuleScreen';
 import ApprovalScreen from '../Screens/ApprovalScreen';
 import { DrawerParamList } from './types';
 import ViewDetailScreen from '../Screens/ViewDetailScreen';
@@ -34,20 +35,35 @@ const iconMap: Record<string, DrawerMenuItem['icon']> = {
   ShoppingCart,
   Briefcase: BriefcaseBusiness,
   LayoutDashboard,
+  FileText,
+  Bookmark,
+  DollarSign,
+  Users,
+  Package,
+  Truck,
+  Book: BookOpen,
+  User,
+  Zap,
+  Database,
+  Building2,
+  TrendingUp,
+  RotateCcw,
 };
 
 function SidebarContent(
   props: DrawerContentComponentProps & {
     onLogout: () => void;
     allowedCards: any[];
+    allCards: any[];
     userName: string;
     counts: Record<string, number>;
   },
 ) {
-  const { navigation, state, onLogout, allowedCards, userName, counts } = props;
+  const { navigation, state, onLogout, allowedCards, allCards, userName, counts } = props;
   const insets = useSafeAreaInsets();
   const drawerStatus = useDrawerStatus();
   const isDrawerOpen = drawerStatus === 'open';
+  const [expandedParents, setExpandedParents] = React.useState<Record<number, boolean>>({});
 
   React.useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -60,10 +76,26 @@ function SidebarContent(
     return Math.max(permissionCount, routeCount);
   };
 
+  const parentCards = allowedCards.filter((card: any) => {
+    const hasChildren = allCards.some((c: any) => c.parentId === card.sno);
+    return hasChildren;
+  });
+  const topLeafCards = allowedCards.filter((card: any) => {
+    const hasChildren = allCards.some((c: any) => c.parentId === card.sno);
+    return !hasChildren && card.parentId == null;
+  });
+
   const menuItems: DrawerMenuItem[] = [
     { key: 'Dashboard', label: 'Dashboard', count: 0, icon: LayoutDashboard },
     { key: 'ChatList', label: 'Messages', count: 0, icon: MessageSquare },
-    ...allowedCards.map((card: any) => ({
+    ...parentCards.map((card: any) => ({
+      key: card.routeSlug,
+      label: card.cardTitle,
+      count: 0,
+      icon: iconMap[card.iconKey] || LayoutDashboard,
+      parentSno: card.sno,
+    })),
+    ...topLeafCards.map((card: any) => ({
       key: card.routeSlug,
       label: card.cardTitle,
       count: getCount(card.permissionColumn, card.routeSlug),
@@ -71,13 +103,36 @@ function SidebarContent(
     })),
   ];
 
+  const childCardsMap = React.useMemo(() => {
+    const map: Record<number, any[]> = {};
+    for (const card of allCards) {
+      if (card.parentId != null) {
+        if (!map[card.parentId]) map[card.parentId] = [];
+        map[card.parentId].push(card);
+      }
+    }
+    return map;
+  }, [allCards]);
+
+  const toggleParent = (sno: number) => {
+    setExpandedParents(prev => ({ ...prev, [sno]: !prev[sno] }));
+  };
+
+  const getParentCount = (parentSno: number) => {
+    const children = childCardsMap[parentSno];
+    if (!children) return 0;
+    return children.reduce((sum, child) => {
+      return sum + getCount(child.permissionColumn, child.routeSlug);
+    }, 0);
+  };
+
   return (
     <>
       <StatusBar style={drawerStatus === 'open' ? 'light' : 'dark'} />
       <DrawerContentScrollView
         {...props}
         contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}
-        scrollEnabled={false}
+        showsVerticalScrollIndicator={false}
       >
         <View className="flex-1 px-3 py-4">
           <View className="mb-4 flex-row items-center justify-between">
@@ -100,46 +155,121 @@ function SidebarContent(
 
           <View className="h-px bg-white/10 mb-4" />
 
-          <View className="flex-1 gap-2">
+          <View className="flex-1 gap-1">
             {menuItems.map((item) => {
+              const isParent = 'parentSno' in item && item.parentSno != null;
               const index = state.routeNames.indexOf(item.key);
               const focused = state.index === index;
               const Icon = item.icon;
+              const parentSno = (item as any).parentSno as number | undefined;
+              const isExpanded = parentSno != null ? expandedParents[parentSno] : false;
+              const children = parentSno != null ? childCardsMap[parentSno] || [] : [];
+              const parentCount = parentSno != null ? getParentCount(parentSno) : 0;
 
               return (
-                <Pressable
-                  key={item.key}
-                  onPress={() => {
-                    if (item.key === 'Dashboard' || item.key === 'ChatList') {
-                      navigation.navigate(item.key as any);
-                      return;
-                    }
+                <React.Fragment key={`group-${item.key}`}>
+                  <Pressable
+                    onPress={() => {
+                      if (isParent) {
+                        if (parentSno != null) toggleParent(parentSno);
+                        return;
+                      }
+                      if (item.key === 'Dashboard' || item.key === 'ChatList') {
+                        navigation.navigate(item.key as any);
+                        return;
+                      }
+                      if (item.count <= 0) {
+                        Alert.alert('No pending entries', `No pending requests for ${item.label}`);
+                        return;
+                      }
+                      navigation.navigate(item.key as any, {
+                        title: item.label,
+                        subtitle: 'Review pending requests',
+                        routeSlug: item.key,
+                      });
+                    }}
+                    className={`flex-row items-center justify-between rounded-2xl px-4 py-3.5 ${focused ? 'bg-white/15' : 'bg-transparent'}`}
+                  >
+                    <View className="flex-row items-center flex-1">
+                      <Icon size={19} color={focused ? '#FFFFFF' : '#C7D2FE'} strokeWidth={2.2} />
+                      <Text
+                        className={`ml-3 flex-1 text-base font-extrabold ${focused ? 'text-white' : 'text-indigo-100'}`}
+                        numberOfLines={1}
+                      >
+                        {item.label}
+                      </Text>
+                    </View>
+                    {isParent ? (
+                      <View className="flex-row items-center gap-2">
+                        {parentCount > 0 && (
+                          <View className="h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5">
+                            <Text className="text-xs font-black text-white">{parentCount}</Text>
+                          </View>
+                        )}
+                        {isExpanded ? (
+                          <ChevronDown size={16} color="#C7D2FE" />
+                        ) : (
+                          <ChevronRight size={16} color="#C7D2FE" />
+                        )}
+                      </View>
+                    ) : (
+                      item.count > 0 && (
+                        <View className="h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5">
+                          <Text className="text-xs font-black text-white">{item.count}</Text>
+                        </View>
+                      )
+                    )}
+                  </Pressable>
 
-                    if (item.count <= 0) {
-                      Alert.alert('No pending entries', `No pending requests for ${item.label}`);
-                      return;
-                    }
+                  {isParent && isExpanded && children.length > 0 && (
+                    <View className="ml-4 gap-0.5 border-l-2 border-indigo-400/30 pl-2">
+                      {children.map((child: any) => {
+                        const childKey = child.routeSlug;
+                        const childIndex = state.routeNames.indexOf(childKey);
+                        const childFocused = state.index === childIndex;
+                        const childIcon = iconMap[child.iconKey] || LayoutDashboard;
+                        const childCount = getCount(child.permissionColumn, child.routeSlug);
 
-                    navigation.navigate(item.key as any, {
-                      title: item.label,
-                      subtitle: 'Review pending requests',
-                      routeSlug: item.key,
-                    });
-                  }}
-                  className={`flex-row items-center justify-between rounded-2xl px-4 py-4 ${focused ? 'bg-white/15' : 'bg-transparent'}`}
-                >
-                  <View className="flex-row items-center">
-                    <Icon size={19} color={focused ? '#FFFFFF' : '#C7D2FE'} strokeWidth={2.2} />
-                    <Text className={`ml-3 text-base font-extrabold ${focused ? 'text-white' : 'text-indigo-100'}`}>
-                      {item.label}
-                    </Text>
-                  </View>
-                  {item.count > 0 && (
-                    <View className="h-7 min-w-7 items-center justify-center rounded-full bg-rose-500 px-2">
-                      <Text className="text-xs font-black text-white">{item.count}</Text>
+                        return (
+                          <Pressable
+                            key={childKey}
+                            onPress={() => {
+                              if (childCount <= 0) {
+                                Alert.alert('No pending entries', `No pending requests for ${child.cardTitle}`);
+                                return;
+                              }
+                              navigation.navigate(childKey as any, {
+                                title: child.cardTitle,
+                                subtitle: 'Review pending requests',
+                                routeSlug: childKey,
+                              });
+                            }}
+                            className={`flex-row items-center justify-between rounded-xl px-3 py-2.5 ${childFocused ? 'bg-white/15' : 'bg-transparent'}`}
+                          >
+                            <View className="flex-row items-center flex-1">
+                              {React.createElement(childIcon, {
+                                size: 15,
+                                color: childFocused ? '#FFFFFF' : '#A5B4FC',
+                                strokeWidth: 2.2,
+                              })}
+                              <Text
+                                className={`ml-2.5 flex-1 text-sm font-bold ${childFocused ? 'text-white' : 'text-indigo-200'}`}
+                                numberOfLines={1}
+                              >
+                                {child.cardTitle}
+                              </Text>
+                            </View>
+                            {childCount > 0 && (
+                              <View className="h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1">
+                                <Text className="text-[10px] font-black text-white">{childCount}</Text>
+                              </View>
+                            )}
+                          </Pressable>
+                        );
+                      })}
                     </View>
                   )}
-                </Pressable>
+                </React.Fragment>
               );
             })}
           </View>
@@ -171,9 +301,9 @@ export default function AppDrawerNavigator() {
 
   const allowedCards = useMemo(
     () => (Array.isArray(cards) ? cards : []).filter((card: any) =>
-      userPermissions.includes(card.permissionColumn)
+      user?.role?.toLowerCase() === 'admin' || userPermissions.includes(card.permissionColumn)
     ),
-    [userPermissions, cards],
+    [user, userPermissions, cards],
   );
 
   useFocusEffect(
@@ -215,6 +345,7 @@ export default function AppDrawerNavigator() {
             {...props}
             onLogout={() => dispatch(logoutUser())}
             allowedCards={allowedCards}
+            allCards={cards}
             userName={userName}
             counts={counts}
           />
@@ -268,6 +399,11 @@ export default function AppDrawerNavigator() {
       }}
     >
       <Drawer.Screen name="Dashboard" component={DashboardScreen} />
+      <Drawer.Screen
+        name="SubModule"
+        component={SubModuleScreen}
+        options={{ drawerItemStyle: { display: 'none' } }}
+      />
       {allowedCards.map((card: any) => (
         <Drawer.Screen
           key={card.routeSlug}

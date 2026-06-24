@@ -21,6 +21,7 @@ import ExpandableText from "../components/ExpandableText";
 import PdfViewerModal from "../components/ApprovalDetails/PdfViewerModal";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { fetchApprovalRecords } from "@/redux/slices/approvalSlice";
+import { fetchDashboardCards } from "@/redux/slices/dashboardSlice";
 
 interface ApprovalDetailsPageProps {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -31,18 +32,6 @@ type PendingStatusUpdate = {
     status: "PENDING" | "APPROVED" | "REJECTED" | "HOLD";
 };
 
-// Mock data
-import {
-    DASHBOARD_CARDS,
-    PURCHASE_ORDER_FILES_UPLOAD,
-    INVOICE_TEMPLATE_DATA,
-    PURCHASE_ORDER_DTL,
-    PURCHASE_ORDER_ADDITIONAL_COST_DETAILS,
-    PRODUCT_MASTER,
-    SUPPLIER_MASTER,
-    COMPANY_MASTER,
-    STORE_MASTER
-} from "../config/mockData";
 
 
 // Main Table columns
@@ -134,11 +123,9 @@ function getTableColumns(
         {
             key: 'companyId',
             label: 'Company',
-            render: (id: any) => {
-                // eslint-disable-next-line eqeqeq
-                const company = COMPANY_MASTER.find(c => c.companyId == id);
-                return <span className="text-slate-500 font-semibold">{company?.companyName || id}</span>;
-            }
+            render: (id: any, row: any) => (
+                <span className="text-slate-500 font-semibold">{row.companyName || id}</span>
+            )
         },
         { key: 'poRefNo', label: refLabel, render: (value: string) => <span className="text-[13px] font-bold text-slate-700">{value}</span> },
         {
@@ -151,25 +138,19 @@ function getTableColumns(
         {
             key: 'supplierId',
             label: 'Supplier',
-            render: (value: any) => {
-                // eslint-disable-next-line eqeqeq
-                const supplier = SUPPLIER_MASTER.find(s => s.supplierId == value);
-                return (
-                    <span className="text-[12px] font-bold text-slate-700 leading-tight uppercase max-w-[150px] block truncate" title={supplier?.supplierName}>
-                        {supplier?.supplierName || value}
-                    </span>
-                );
-            }
+            render: (value: any, row: any) => (
+                <span className="text-[12px] font-bold text-slate-700 leading-tight uppercase max-w-[150px] block truncate">
+                    {row.supplierName || value}
+                </span>
+            )
         },
         {
             key: 'poStoreId',
             label: 'Dept',
             responsiveClass: 'hidden md:table-cell',
-            render: (id: any) => {
-                // eslint-disable-next-line eqeqeq
-                const store = STORE_MASTER.find(s => s.storeId == id);
-                return <span className="text-slate-600 font-medium">{store?.storeName || id}</span>;
-            }
+            render: (id: any, row: any) => (
+                <span className="text-slate-600 font-medium">{row.storeName || id}</span>
+            )
         },
         { key: 'amount', label: 'Amount', render: (value: number, row: any) => <span className="font-black text-slate-900 text-[14px]">{value?.toLocaleString()} {row.currencyType}</span> },
         {
@@ -227,6 +208,7 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
     const approvalType = (params?.approvalType as string) || "";
 
     const { records, loading: recordsLoading } = useAppSelector((state: any) => state.approval);
+    const { cards: allCards } = useAppSelector((state: any) => state.dashboard);
 
     // Get query parameters from URL
     const [queryParams, setQueryParams] = useState<Record<string, string>>({});
@@ -237,7 +219,17 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
     const [currentPdfData, setCurrentPdfData] = useState<string>("");
     const [currentPdfTitle, setCurrentPdfTitle] = useState<string>("");
 
+    const currentCard = useMemo(
+        () => (Array.isArray(allCards) ? allCards : []).find((c: any) => c.routeSlug === approvalType),
+        [allCards, approvalType]
+    );
 
+    const childCards = useMemo(
+        () => (Array.isArray(allCards) ? allCards : []).filter((c: any) => c.parentId === currentCard?.sno),
+        [allCards, currentCard]
+    );
+
+    const hasSubTypes = childCards.length > 0;
 
     useEffect(() => {
         if (!searchParams) return;
@@ -258,6 +250,10 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const [selectedRows, setSelectedRows] = useState<number[]>([]);
     const [expandedRows, setExpandedRows] = useState<number[]>([]);
+
+    useEffect(() => {
+        dispatch(fetchDashboardCards());
+    }, [dispatch]);
 
     useEffect(() => {
         if (approvalType) {
@@ -307,182 +303,154 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
     }, [router, approvalType]);
 
 
-    const handleViewDocument = React.useCallback((row: any) => {
-        const matchingFiles = PURCHASE_ORDER_FILES_UPLOAD.filter(
-            (file: any) => file.poRefNo === row.poRefNo && file.statusMaster === "ACTIVE"
-        );
-
-        if (matchingFiles.length === 0) {
-            toast.error(`No document found for ${row.poRefNo}`);
-            return;
-        }
-
-        const selectedFile =
-            matchingFiles.find((file: any) => file.fileType === "INVOICE" && file.contentType === "application/pdf") ||
-            matchingFiles.find((file: any) => file.contentType === "application/pdf");
-
-        if (!selectedFile?.contentData) {
-            toast.error(`Document content is missing for ${row.poRefNo}`);
-            return;
-        }
-
+    const handleViewDocument = React.useCallback(async (row: any) => {
+        setIsLoading(true);
         try {
+            const res = await fetch(`/api/approvals/${approvalType}/${row.sno || row.id}`);
+            if (!res.ok) throw new Error('Failed to fetch document');
+            const detail = await res.json();
+            const matchingFiles: any[] = detail?.files || [];
+
+            if (matchingFiles.length === 0) {
+                toast.error(`No document found for ${row.poRefNo}`);
+                return;
+            }
+
+            const selectedFile =
+                matchingFiles.find((file: any) => file.fileType === 'INVOICE' && file.contentType === 'application/pdf') ||
+                matchingFiles.find((file: any) => file.contentType === 'application/pdf');
+
+            if (!selectedFile?.contentData) {
+                toast.error(`Document content is missing for ${row.poRefNo}`);
+                return;
+            }
+
             setCurrentPdfData(selectedFile.contentData);
             setCurrentPdfTitle(`Document - ${row.poRefNo}`);
             setIsPdfModalOpen(true);
-
             toast.success(`Opening document for ${row.poRefNo}...`);
         } catch {
             toast.error(`Failed to open document for ${row.poRefNo}`);
+        } finally {
+            setIsLoading(false);
         }
-    }, []);
+    }, [approvalType]);
 
     const handleGenerateInvoicePdf = React.useCallback(async (row: any) => {
-        const buildTemplateFromRow = (poRow: any) => {
-            const lineItems = PURCHASE_ORDER_DTL
-                .filter((item: any) => item.poRefNo === poRow.poRefNo)
-                .map((item: any) => {
-                    const product = item.productId
-                        ? PRODUCT_MASTER.find((p: any) => p.productId === item.productId)
-                        : undefined;
-                    const qty = Number(item.totalPcs ?? item.totalPacking ?? 0);
-                    const unitPrice = Number(item.ratePerPcs ?? 0);
-                    const amount = Number(
-                        item.totalProductAmount ??
-                        item.productAmount ??
-                        item.finalProductAmount ??
-                        qty * unitPrice
-                    );
+        setIsLoading(true);
+        try {
+            // ── Fetch live data from API ──────────────────────────────────────
+            const res = await fetch(`/api/approvals/${approvalType}/${row.sno || row.id}`);
+            if (!res.ok) throw new Error('API fetch failed');
+            const detail = await res.json();
 
-                    return {
-                        ...item,
-                        productName: product?.productName || item.alternateProductName || `Product ${item.productId ?? ""}`.trim(),
-                        specification: product?.specification || item.remarks || "-",
-                        orderedQty: qty,
-                        unitPrice,
-                        amount
-                    };
-                });
+            const lineItems: any[] = (detail?.productLineItems || []).map((item: any) => {
+                const qty = Number(item.totalPcs ?? item.totalPacking ?? item.orderedQty ?? 0);
+                const unitPrice = Number(item.ratePerPcs ?? item.unitPrice ?? 0);
+                const amount = Number(
+                    item.totalProductAmount ?? item.productAmount ??
+                    item.finalProductAmount ?? item.amount ?? (qty * unitPrice)
+                );
+                return {
+                    ...item,
+                    productName: item.productName || item.alternateProductName || `Product ${item.productId ?? ''}`.trim(),
+                    specification: item.specification || item.remarks || '-',
+                    orderedQty: qty,
+                    unitPrice,
+                    amount
+                };
+            });
 
-            const additionalCosts = PURCHASE_ORDER_ADDITIONAL_COST_DETAILS
-                .filter((cost: any) => cost.poRefNo === poRow.poRefNo && cost.statusMaster === "ACTIVE")
+            const additionalCosts: any[] = (detail?.additionalCosts || [])
+                .filter((cost: any) => cost.statusMaster === 'ACTIVE')
                 .map((cost: any) => ({
                     ...cost,
-                    costType: cost.additionalCostType || "ADDITIONAL_COST",
+                    costType: cost.additionalCostType || 'ADDITIONAL_COST',
                     vatAmount: Number(cost.vatAmount ?? 0)
                 }));
 
-            const subtotal = lineItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
-            const addCostTotal = additionalCosts.reduce((sum: number, cost: any) => sum + Number(cost.amount || 0), 0);
-            const vatFromItems = lineItems.reduce((sum: number, item: any) => sum + Number(item.vatAmount || 0), 0);
-            const vat = Number(poRow.vatHdrAmount ?? vatFromItems ?? 0);
-            const total = Number(poRow.totalFinalProductionHdrAmount ?? subtotal + addCostTotal + vat);
+            const supplier = detail?.supplier || {};
+            const company = detail?.company || {};
+            const store = detail?.store || {};
 
-            return {
-                header: {
-                    poRefNo: poRow.poRefNo,
-                    poDate: String(poRow.poDate || poRow.createdDate || "").split(" ")[0] || "-",
-                    supplier: SUPPLIER_MASTER.find((s: any) => s.supplierId === poRow.supplierId),
-                    company: COMPANY_MASTER.find((c: any) => c.companyId === poRow.companyId),
-                    store: STORE_MASTER.find((s: any) => s.storeId === poRow.poStoreId)
-                },
-                lineItems,
-                additionalCosts,
-                totals: {
-                    subtotal,
-                    additionalCosts: addCostTotal,
-                    vat,
-                    total
-                }
-            };
-        };
-
-        const template =
-            (INVOICE_TEMPLATE_DATA as Record<string, any>)[row.poRefNo] ||
-            buildTemplateFromRow(row);
-
-        if (!template?.header?.poRefNo) {
-            toast.error(`Unable to build invoice template for ${row.poRefNo}`);
-            return;
-        }
-
-        try {
-            const [{ jsPDF }, autoTableModule] = await Promise.all([
-                import("jspdf"),
-                import("jspdf-autotable")
-            ]);
-
-            const autoTable = autoTableModule.default;
-            const doc = new jsPDF({ unit: "mm", format: "a4" });
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const margin = 12;
-            const right = pageWidth - margin;
-
-            const header = template.header || {};
-            const supplier = header.supplier || {};
-            const company = header.company || {};
-            const store = header.store || {};
-            const lineItems: any[] = template.lineItems || [];
-            const additionalCosts: any[] = template.additionalCosts || [];
-            const totals = template.totals || {};
+            const subtotal = lineItems.reduce((s, i) => s + Number(i.amount || 0), 0);
+            const addCostTotal = additionalCosts.reduce((s, c) => s + Number(c.amount || 0), 0);
+            const vat = Number(row.vatHdrAmount ?? 0);
+            const total = Number(row.totalFinalProductionHdrAmount ?? subtotal + addCostTotal + vat);
 
             const fmt = (value: any) =>
                 Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            // Dynamically generate QR Code URL
-            const qrId = header.poRefNo || row.poRefNo;
-            const qrContent = `${process.env.NEXT_PUBLIC_APP_URL}qrscan?id=%22${qrId}%22`;
+            // ── Dynamic title ──────────────────────────────────────────────────
+            const invoiceTitle = (approvalType || 'approval')
+                .replace(/-/g, ' ')
+                .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+            const poRef = row.poRefNo || row.refNo || row.requestRefNo || '-';
+            const poDate = String(row.poDate || row.createdDate || '').split('T')[0] || '-';
+
+            // ── QR Code ───────────────────────────────────────────────────────
+            const qrContent = `${process.env.NEXT_PUBLIC_APP_URL}qrscan?id=%22${encodeURIComponent(poRef)}%22`;
             const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrContent)}`;
 
-            // Load QR Image before drawing
+            const [{ jsPDF }, autoTableModule] = await Promise.all([
+                import('jspdf'),
+                import('jspdf-autotable')
+            ]);
+
+            const autoTable = autoTableModule.default;
+            const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 12;
+            const right = pageWidth - margin;
+
+            // Load QR image
             const qrImg = await new Promise<HTMLImageElement>((resolve, reject) => {
                 const img = new window.Image();
-                img.crossOrigin = "anonymous";
+                img.crossOrigin = 'anonymous';
                 img.onload = () => resolve(img);
-                img.onerror = () => reject(new Error("QR Load Failed"));
+                img.onerror = () => reject(new Error('QR Load Failed'));
                 img.src = qrApiUrl;
             });
+            doc.addImage(qrImg, 'PNG', right - 25, 8, 25, 25);
 
-            // Draw QR Code (Top Right)
-            doc.addImage(qrImg, "PNG", right - 25, 8, 25, 25);
-
-            doc.setFont("helvetica", "bold");
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(16);
-            doc.text("PURCHASE INVOICE", margin, 14);
+            doc.text(invoiceTitle.toUpperCase(), margin, 14);
 
-            doc.setFont("helvetica", "normal");
+            doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
-            doc.text(`Ref: ${header.poRefNo || row.poRefNo || "-"}`, margin, 21);
-            doc.text(`Date: ${header.poDate || "-"}`, margin, 26);
+            doc.text(`Ref: ${poRef}`, margin, 21);
+            doc.text(`Date: ${poDate}`, margin, 26);
             doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, 31);
 
-            doc.setFont("helvetica", "bold");
-            doc.text("Supplier", margin, 38);
-            doc.text("Company / Store", right - 70, 38);
-            doc.setFont("helvetica", "normal");
-            doc.text(String(supplier.supplierName || "-"), margin, 43);
-            doc.text(String(company.companyName || "-"), right - 70, 43);
-            doc.text(String(store.storeName || "-"), right - 70, 48);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Supplier', margin, 38);
+            doc.text('Company / Store', right - 70, 38);
+            doc.setFont('helvetica', 'normal');
+            doc.text(String(supplier.supplierName || '-'), margin, 43);
+            doc.text(String(company.companyName || '-'), right - 70, 43);
+            doc.text(String(store.storeName || '-'), right - 70, 48);
 
             autoTable(doc, {
                 startY: 55,
-                head: [["#", "Product", "Specification", "Qty", "Unit Price", "Amount"]],
+                head: [['#', 'Product', 'Specification', 'Qty', 'Unit Price', 'Amount']],
                 body: lineItems.map((item: any, index: number) => [
                     index + 1,
-                    item.productName || item.alternateProductName || "-",
-                    item.specification || item.remarks || "-",
-                    fmt(item.orderedQty ?? item.totalPcs ?? item.totalPacking ?? 0),
-                    fmt(item.unitPrice ?? item.ratePerPcs ?? 0),
-                    fmt(item.amount ?? item.totalProductAmount ?? item.productAmount ?? item.finalProductAmount ?? 0)
+                    item.productName || '-',
+                    item.specification || '-',
+                    fmt(item.orderedQty),
+                    fmt(item.unitPrice),
+                    fmt(item.amount)
                 ]),
-                theme: "grid",
+                theme: 'grid',
                 styles: { fontSize: 8, cellPadding: 2.5 },
                 headStyles: { fillColor: [15, 23, 42] },
                 columnStyles: {
-                    0: { halign: "center", cellWidth: 10 },
-                    3: { halign: "right", cellWidth: 20 },
-                    4: { halign: "right", cellWidth: 26 },
-                    5: { halign: "right", cellWidth: 26 }
+                    0: { halign: 'center', cellWidth: 10 },
+                    3: { halign: 'right', cellWidth: 20 },
+                    4: { halign: 'right', cellWidth: 26 },
+                    5: { halign: 'right', cellWidth: 26 }
                 }
             });
 
@@ -490,18 +458,18 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
 
             autoTable(doc, {
                 startY: lineItemsEndY + 6,
-                head: [["Cost Type", "Amount", "VAT"]],
+                head: [['Cost Type', 'Amount', 'VAT']],
                 body: additionalCosts.map((cost: any) => [
-                    String(cost.costType || cost.additionalCostType || "-").replaceAll("_", " "),
+                    String(cost.costType || '-').replaceAll('_', ' '),
                     fmt(cost.amount),
                     fmt(cost.vatAmount ?? 0)
                 ]),
-                theme: "grid",
+                theme: 'grid',
                 styles: { fontSize: 8, cellPadding: 2.5 },
                 headStyles: { fillColor: [30, 64, 175] },
                 columnStyles: {
-                    1: { halign: "right", cellWidth: 30 },
-                    2: { halign: "right", cellWidth: 30 }
+                    1: { halign: 'right', cellWidth: 30 },
+                    2: { halign: 'right', cellWidth: 30 }
                 }
             });
 
@@ -511,44 +479,36 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                 startY: costsEndY + 6,
                 margin: { left: right - 78 },
                 body: [
-                    ["Subtotal", fmt(totals.subtotal)],
-                    ["Additional Costs", fmt(totals.additionalCosts)],
-                    ["VAT", fmt(totals.vat)],
-                    ["Total", fmt(totals.total)]
+                    ['Subtotal', fmt(subtotal)],
+                    ['Additional Costs', fmt(addCostTotal)],
+                    ['VAT', fmt(vat)],
+                    ['Total', `${fmt(total)} ${row.currencyType || 'TZS'}`]
                 ],
-                theme: "grid",
+                theme: 'grid',
                 styles: { fontSize: 9, cellPadding: 2.5 },
                 columnStyles: {
-                    0: { fontStyle: "bold", cellWidth: 45 },
-                    1: { halign: "right", cellWidth: 33 }
+                    0: { fontStyle: 'bold', cellWidth: 45 },
+                    1: { halign: 'right', cellWidth: 33 }
                 }
             });
 
             const pdfOutput = doc.output('datauristring');
             setCurrentPdfData(pdfOutput);
-            setCurrentPdfTitle(`Invoice - ${header.poRefNo || row.poRefNo || "Document"}`);
+            setCurrentPdfTitle(`${invoiceTitle} - ${poRef}`);
             setIsPdfModalOpen(true);
-
-            toast.success(`PDF generated for ${row.poRefNo}`);
+            toast.success(`PDF generated for ${poRef}`);
         } catch {
             toast.error(`Failed to generate PDF for ${row.poRefNo}`);
+        } finally {
+            setIsLoading(false);
         }
-    }, []);
+    }, [approvalType]);
 
     // Get page title from query params or from route
     const pageTitle = useMemo(() => {
-        // 1. Try to get from query params (passed from dashboard if any)
-        if (queryParams.cardTitle) {
-            return queryParams.cardTitle;
-        }
-
-        // 2. Try to get from DASHBOARD_CARDS configuration dynamically
-        const card = DASHBOARD_CARDS.find(c => c.routeSlug === approvalType);
-        if (card) return card.cardTitle;
-
-        // 3. Fallback to route-based formatting
-        if (!approvalType) return "Approval Details";
-        return approvalType.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        if (queryParams.cardTitle) return queryParams.cardTitle;
+        if (!approvalType) return 'Approval Details';
+        return approvalType.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
     }, [approvalType, queryParams]);
 
     // Combined Data Filtering logic
@@ -669,6 +629,26 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
             <div className="min-h-screen bg-transparent pb-10">
                 <div className="w-full space-y-6">
 
+                    {/* Sub-Type Tabs */}
+                    {hasSubTypes && (
+                        <div className="flex flex-wrap gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-200">
+                            <button
+                                className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                            >
+                                {currentCard?.cardTitle || pageTitle}
+                            </button>
+                            {childCards.map((child: any) => (
+                                <button
+                                    key={child.routeSlug}
+                                    onClick={() => router.push(`/${child.routeSlug}`)}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all"
+                                >
+                                    {child.cardTitle}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Advanced Filter Component */}
                     <FilterForm
                         filters={filters}
@@ -680,22 +660,18 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                         filterOptions={useMemo(() => {
                             const rawData = records || [];
                             return {
-                                companies: Array.from(new Set(rawData.map((i: any) => i.companyId))).filter(Boolean).map(id => {
-                                    // eslint-disable-next-line eqeqeq
-                                    const company = COMPANY_MASTER.find(c => c.companyId == id);
-                                    return { id, name: company?.companyName || String(id) };
-                                }),
+                                companies: Array.from(
+                                    new Map(rawData.map((i: any) => [i.companyId, i.companyName || String(i.companyId)])).entries()
+                                ).filter(([id]) => id).map(([id, name]) => ({ id, name })),
                                 purchaseTypes: Array.from(new Set(rawData.map((i: any) => i.purchaseType))).filter(Boolean).map(String),
-                                suppliers: Array.from(new Set(rawData.map((i: any) => i.supplierId))).filter(Boolean).map(id => {
-                                    // eslint-disable-next-line eqeqeq
-                                    const supplier = SUPPLIER_MASTER.find(s => s.supplierId == id);
-                                    return { id, name: supplier?.supplierName || String(id) };
-                                }),
-                                departments: Array.from(new Set(rawData.map((i: any) => i.poStoreId))).filter(Boolean).map(id => {
-                                    // eslint-disable-next-line eqeqeq
-                                    const store = STORE_MASTER.find(s => s.storeId == id);
-                                    return { id, name: store?.storeName || String(id) };
-                                })
+                                suppliers: Array.from(new Set(rawData.map((i: any) => i.supplierId))).filter(Boolean).map(id => ({
+                                    id,
+                                    name: rawData.find((i: any) => i.supplierId === id)?.supplierName || String(id)
+                                })),
+                                departments: Array.from(new Set(rawData.map((i: any) => i.poStoreId))).filter(Boolean).map(id => ({
+                                    id,
+                                    name: rawData.find((i: any) => i.poStoreId === id)?.storeName || String(id)
+                                }))
                             };
                         }, [records])}
                     />
@@ -830,23 +806,21 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                                             <div className="flex items-center space-x-2">
                                                 <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]"></div>
                                                 <span className="text-[14px] font-bold text-slate-800">
-                                                    {/* eslint-disable-next-line eqeqeq */}
-                                                    {COMPANY_MASTER.find(c => c.companyId == row.companyId)?.companyName || row.companyId}
+                                                    {row.companyName || row.companyId}
                                                 </span>
                                             </div>
                                         </div>
                                         <div className="flex flex-col border-l border-slate-100 pl-8">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Currency Axis</span>
                                             <p className="text-[14px] font-bold text-slate-800 uppercase flex items-center space-x-1.5">
-                                                <span className="text-slate-400 font-medium">{row.currencyType || 'USD'}</span>
+                                                <span className="text-slate-400 font-medium">{row.currencyType || 'TZS'}</span>
                                                 <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px]">BASE</span>
                                             </p>
                                         </div>
                                         <div className="flex flex-col border-l border-slate-100 pl-8">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Operational Dept</span>
                                             <p className="text-[14px] font-bold text-slate-800">
-                                                {/* eslint-disable-next-line eqeqeq */}
-                                                {STORE_MASTER.find(s => s.storeId == row.poStoreId)?.storeName || row.poStoreId}
+                                                {row.storeName || row.poStoreId}
                                             </p>
                                         </div>
                                         <div className="flex flex-col border-l border-slate-100 pl-8">
