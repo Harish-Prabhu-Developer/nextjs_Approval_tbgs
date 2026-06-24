@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server';
-import { PURCHASE_ORDER_CONVERSATION_DTL } from '@/app/config/mockData';
+import { db } from '@/db';
+import { purchaseOrderConversation } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const poRefNo = searchParams.get('poRefNo');
     
     if (!poRefNo) {
-        return NextResponse.json({ message: 'poRefNo is required' }, { status:400 });
+        return NextResponse.json({ message: 'poRefNo is required' }, { status: 400 });
     }
     
-    // In real app, query table tbl_purchase_order_conversation
-    const conversations = PURCHASE_ORDER_CONVERSATION_DTL.filter(
-        (item: any) => item.poRefNo === poRefNo
-    );
-    
-    return NextResponse.json(conversations);
+    try {
+        const conversations = await db.select()
+            .from(purchaseOrderConversation)
+            .where(eq(purchaseOrderConversation.poRefNo, poRefNo))
+            .orderBy(purchaseOrderConversation.createdDate);
+        
+        return NextResponse.json(conversations);
+    } catch (error) {
+        console.error('Error fetching conversations:', error);
+        return NextResponse.json({ message: 'Error fetching conversations' }, { status: 500 });
+    }
 }

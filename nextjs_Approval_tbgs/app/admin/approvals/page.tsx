@@ -124,10 +124,13 @@ const ApprovalsManagementPage = () => {
         permissionColumn: '',
         routeSlug: '',
         approvalType: '',
+        cardType: 'approval' as 'approval' | 'sub-approval',
+        parentId: '',
         iconKey: 'LayoutDashboard',
         backgroundColor: 'indigo',
-        parentId: ''
+        childIds: [] as number[]
     });
+    const [childSearch, setChildSearch] = useState('');
 
     const emptyLineItem = () => ({
         productId: '',
@@ -157,6 +160,12 @@ const ApprovalsManagementPage = () => {
         trailerId: ''
     });
 
+    const [showAddStore, setShowAddStore] = useState(false);
+    const [newStoreName, setNewStoreName] = useState('');
+    const [newStoreCompanyId, setNewStoreCompanyId] = useState('');
+    const [newStoreLocation, setNewStoreLocation] = useState('');
+    const [addingStore, setAddingStore] = useState(false);
+
     useEffect(() => {
         fetchData();
         fetchRequests();
@@ -168,7 +177,7 @@ const ApprovalsManagementPage = () => {
             setLoading(true);
             const response = await fetch('/api/admin/approvals');
             const data = await response.json();
-            setApprovals(data);
+            setApprovals(Array.isArray(data) ? data : []);
         } catch (error) {
             toast.error('Failed to load dashboard cards');
         } finally {
@@ -181,7 +190,7 @@ const ApprovalsManagementPage = () => {
             setReqLoading(true);
             const response = await fetch('/api/admin/approvals/request');
             const data = await response.json();
-            setRequests(data);
+            setRequests(Array.isArray(data) ? data : []);
         } catch (error) {
             toast.error('Failed to load approval requests');
         } finally {
@@ -225,23 +234,72 @@ const ApprovalsManagementPage = () => {
         }
     };
 
+    const handleAddStore = async () => {
+        if (!newStoreName.trim()) return;
+        setAddingStore(true);
+        try {
+            const res = await fetch('/api/admin/masters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'stores',
+                    storeName: newStoreName.trim(),
+                    companyId: newStoreCompanyId ? Number(newStoreCompanyId) : null,
+                    location: newStoreLocation.trim() || null,
+                })
+            });
+            if (res.ok) {
+                const created = await res.json();
+                toast.success('Store created');
+                await fetchMasters();
+                setRequestData(prev => ({ ...prev, poStoreId: String(created.storeId) }));
+                setShowAddStore(false);
+                setNewStoreName('');
+                setNewStoreCompanyId('');
+                setNewStoreLocation('');
+            } else {
+                toast.error('Failed to create store');
+            }
+        } catch {
+            toast.error('Server error');
+        } finally {
+            setAddingStore(false);
+        }
+    };
+
     // --- Approval Card handlers ---
     const handleOpenModal = (approval: any = null) => {
         if (approval) {
+            const isSub = !!approval.parentId;
             setCurrentApproval(approval);
             setFormData({
                 cardTitle: approval.cardTitle,
                 permissionColumn: approval.permissionColumn,
                 routeSlug: approval.routeSlug,
                 approvalType: approval.approvalType,
+                cardType: isSub ? 'sub-approval' : 'approval',
+                parentId: isSub ? String(approval.parentId) : '',
                 iconKey: approval.iconKey || 'LayoutDashboard',
                 backgroundColor: approval.backgroundColor || 'indigo',
-                parentId: approval.parentId ? String(approval.parentId) : ''
+                childIds: isSub ? [] : approvals
+                    .filter(a => a.parentId === approval.sno)
+                    .map(a => a.sno)
             });
         } else {
             setCurrentApproval(null);
-            setFormData({ cardTitle: '', permissionColumn: '', routeSlug: '', approvalType: '', iconKey: 'LayoutDashboard', backgroundColor: 'indigo', parentId: '' });
+            setFormData({
+                cardTitle: '',
+                permissionColumn: '',
+                routeSlug: '',
+                approvalType: '',
+                cardType: 'approval',
+                parentId: '',
+                iconKey: 'LayoutDashboard',
+                backgroundColor: 'indigo',
+                childIds: []
+            });
         }
+        setChildSearch('');
         setIsModalOpen(true);
     };
 
@@ -257,14 +315,25 @@ const ApprovalsManagementPage = () => {
         try {
             const url = currentApproval ? `/api/admin/approvals/${currentApproval.sno}` : '/api/admin/approvals';
             const method = currentApproval ? 'PUT' : 'POST';
+            const isSub = formData.cardType === 'sub-approval';
+            const body: Record<string, any> = {
+                cardTitle: formData.cardTitle,
+                permissionColumn: formData.permissionColumn,
+                routeSlug: formData.routeSlug,
+                approvalType: formData.approvalType,
+                iconKey: formData.iconKey,
+                backgroundColor: formData.backgroundColor,
+                sno: currentApproval?.sno,
+            };
+            if (isSub) {
+                body.parentId = formData.parentId ? Number(formData.parentId) : null;
+            } else {
+                body.childIds = formData.childIds;
+            }
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...formData,
-                    sno: currentApproval?.sno,
-                    parentId: formData.parentId ? Number(formData.parentId) : null
-                })
+                body: JSON.stringify(body)
             });
             if (response.ok) {
                 toast.success(currentApproval ? 'Approval updated' : 'Approval created');
@@ -272,7 +341,8 @@ const ApprovalsManagementPage = () => {
                 dispatch(fetchDashboardCards());
                 handleCloseModal();
             } else {
-                toast.error('Action failed');
+                const err = await response.json().catch(() => ({}));
+                toast.error(err.message || 'Action failed');
             }
         } catch (error) {
             toast.error('Server error');
@@ -1184,6 +1254,21 @@ const ApprovalsManagementPage = () => {
                                         <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Card Title</label>
                                         <input required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold" placeholder="Purchase Order Approval" value={formData.cardTitle} onChange={e => setFormData({ ...formData, cardTitle: e.target.value })} />
                                     </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Card Type</label>
+                                        <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl border border-slate-100">
+                                            <button type="button"
+                                                onClick={() => setFormData({ ...formData, cardType: 'approval', parentId: '', childIds: [] })}
+                                                className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${formData.cardType === 'approval' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
+                                                Approval
+                                            </button>
+                                            <button type="button"
+                                                onClick={() => setFormData({ ...formData, cardType: 'sub-approval', childIds: [] })}
+                                                className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${formData.cardType === 'sub-approval' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
+                                                Sub Approval
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Permission Code</label>
@@ -1204,18 +1289,67 @@ const ApprovalsManagementPage = () => {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Parent Card</label>
-                                        <select className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                            value={formData.parentId} onChange={e => setFormData({ ...formData, parentId: e.target.value })}>
-                                            <option value="">— None (Top-level card) —</option>
-                                            {approvals
-                                                .filter(a => a.sno !== currentApproval?.sno)
-                                                .map(a => (
-                                                    <option key={a.sno} value={a.sno}>{a.cardTitle} ({a.routeSlug})</option>
-                                                ))}
-                                        </select>
-                                    </div>
+
+                                    {formData.cardType === 'sub-approval' ? (
+                                        /* Sub Approval: select parent card */
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Parent Card</label>
+                                            <p className="text-[10px] text-slate-400 ml-1 mb-2">This sub-approval will only appear as a tab inside the parent approval page</p>
+                                            <select className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
+                                                value={formData.parentId} onChange={e => setFormData({ ...formData, parentId: e.target.value })}>
+                                                <option value="">— Select parent card —</option>
+                                                {approvals
+                                                    .filter(a => a.sno !== currentApproval?.sno && !a.parentId)
+                                                    .map(a => (
+                                                        <option key={a.sno} value={a.sno}>{a.cardTitle} ({a.routeSlug})</option>
+                                                    ))}
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        /* Approval: select sub-approvals to link */
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">
+                                                Linked Sub-Approvals ({formData.childIds.length} selected)
+                                            </label>
+                                            <p className="text-[10px] text-slate-400 ml-1 mb-2">Select existing approvals to link as sub-approvals of this card</p>
+                                            <div className="relative mb-2">
+                                                <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                <input type="text" placeholder="Search approvals to link..."
+                                                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border-none rounded-xl text-xs focus:ring-2 focus:ring-indigo-500"
+                                                    value={childSearch} onChange={e => setChildSearch(e.target.value)} />
+                                            </div>
+                                            <div className="max-h-48 overflow-y-auto custom-scrollbar p-2 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                                                {approvals
+                                                    .filter(a => a.sno !== currentApproval?.sno)
+                                                    .filter(a => a.parentId)
+                                                    .filter(a => a.cardTitle?.toLowerCase().includes(childSearch.toLowerCase()) || a.routeSlug?.toLowerCase().includes(childSearch.toLowerCase()))
+                                                    .map(app => {
+                                                        const isSelected = formData.childIds.includes(app.sno);
+                                                        return (
+                                                            <label key={app.sno} className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all hover:bg-white ${isSelected ? 'bg-white ring-1 ring-indigo-200' : ''}`}>
+                                                                <input type="checkbox" checked={isSelected}
+                                                                    onChange={() => {
+                                                                        if (isSelected) {
+                                                                            setFormData({ ...formData, childIds: formData.childIds.filter(id => id !== app.sno) });
+                                                                        } else {
+                                                                            setFormData({ ...formData, childIds: [...formData.childIds, app.sno] });
+                                                                        }
+                                                                    }}
+                                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <span className="text-xs font-bold text-slate-700 block truncate">{app.cardTitle}</span>
+                                                                    <span className="text-[10px] text-slate-400">/{app.routeSlug}</span>
+                                                                </div>
+                                                                <span className="text-[9px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full uppercase shrink-0">{app.approvalType}</span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                {approvals.filter(a => a.sno !== currentApproval?.sno).filter(a => a.parentId).filter(a => a.cardTitle?.toLowerCase().includes(childSearch.toLowerCase()) || a.routeSlug?.toLowerCase().includes(childSearch.toLowerCase())).length === 0 && (
+                                                    <p className="text-xs text-slate-400 text-center py-8">No matching approvals found</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Icon & Vibrant Theme Selection</label>
@@ -1337,13 +1471,68 @@ const ApprovalsManagementPage = () => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Department / Store</label>
-                                            <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.poStoreId} onChange={e => setRequestData({ ...requestData, poStoreId: e.target.value })}>
-                                                <option value="">Select Department</option>
-                                                {Array.isArray(stores) && stores.map(s => (
-                                                    <option key={s.storeId} value={s.storeId}>{s.storeName}</option>
-                                                ))}
-                                            </select>
+                                            <div className="flex gap-2">
+                                                <select required className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
+                                                    value={requestData.poStoreId} onChange={e => setRequestData({ ...requestData, poStoreId: e.target.value })}>
+                                                    <option value="">Select Department</option>
+                                                    {Array.isArray(stores) && stores.map(s => (
+                                                        <option key={s.storeId} value={s.storeId}>{s.storeName}</option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowAddStore(true)}
+                                                    className="px-3 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-2xl transition-all shrink-0"
+                                                    title="Add Department / Store"
+                                                >
+                                                    <Icons.Plus size={18} />
+                                                </button>
+                                            </div>
+                                            {showAddStore && (
+                                                <div className="mt-2 p-3 bg-slate-50 border border-indigo-100 rounded-2xl space-y-2">
+                                                    <input
+                                                        className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                                                        placeholder="Store name..."
+                                                        value={newStoreName}
+                                                        onChange={e => setNewStoreName(e.target.value)}
+                                                        autoFocus
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <select className="flex-1 px-3 py-2 bg-white border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                                                            value={newStoreCompanyId}
+                                                            onChange={e => setNewStoreCompanyId(e.target.value)}>
+                                                            <option value="">Select Company</option>
+                                                            {Array.isArray(companies) && companies.map(c => (
+                                                                <option key={c.companyId} value={c.companyId}>{c.companyName}</option>
+                                                            ))}
+                                                        </select>
+                                                        <input
+                                                            className="flex-1 px-3 py-2 bg-white border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                                                            placeholder="Location"
+                                                            value={newStoreLocation}
+                                                            onChange={e => setNewStoreLocation(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddStore}
+                                                            disabled={addingStore || !newStoreName.trim()}
+                                                            className="flex-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+                                                        >
+                                                            {addingStore ? <Icons.Loader2 size={14} className="animate-spin" /> : <Icons.Check size={14} />}
+                                                            <span>Save</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { setShowAddStore(false); setNewStoreName(''); setNewStoreCompanyId(''); setNewStoreLocation(''); }}
+                                                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition-all"
+                                                        >
+                                                            <Icons.X size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Currency</label>

@@ -22,3 +22,30 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: 'Error fetching masters' }, { status: 500 });
     }
 }
+
+export async function POST(request: Request) {
+    try {
+        const body = await request.json();
+        const { type, storeName, companyId, location, status } = body;
+
+        if (type === 'stores') {
+            const allIds = await db.select({ id: stores.storeId }).from(stores);
+            const nextId = allIds.length > 0 ? Math.max(...allIds.map(r => r.id)) + 1 : 1;
+
+            const [created] = await db.insert(stores).values({
+                storeId: nextId,
+                storeName,
+                companyId: companyId || null,
+                location: location || null,
+                status: status || 'Active',
+            }).returning();
+
+            return NextResponse.json(created);
+        }
+
+        return NextResponse.json({ message: 'Invalid type' }, { status: 400 });
+    } catch (error) {
+        console.error('Error creating master:', error);
+        return NextResponse.json({ message: 'Error creating master' }, { status: 500 });
+    }
+}

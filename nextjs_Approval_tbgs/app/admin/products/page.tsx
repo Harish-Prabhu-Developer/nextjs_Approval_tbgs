@@ -9,11 +9,10 @@ import {
     Package, 
     Layers, 
     Tag, 
-    CheckCircle2, 
-    XCircle,
     Loader2,
     Check,
-    Archive
+    Archive,
+    X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,6 +35,14 @@ const ProductsPage = () => {
         specification: '',
         status: 'Active'
     });
+
+    const [showAddMain, setShowAddMain] = useState(false);
+    const [newMainName, setNewMainName] = useState('');
+    const [addingMain, setAddingMain] = useState(false);
+
+    const [showAddSub, setShowAddSub] = useState(false);
+    const [newSubName, setNewSubName] = useState('');
+    const [addingSub, setAddingSub] = useState(false);
 
     useEffect(() => {
         fetchProducts();
@@ -65,6 +72,61 @@ const ProductsPage = () => {
             setSubCategories(await subRes.json());
         } catch (error) {
             console.error('Category loading failed');
+        }
+    };
+
+    const handleAddMainCategory = async () => {
+        if (!newMainName.trim()) return;
+        setAddingMain(true);
+        try {
+            const res = await fetch('/api/admin/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'main', categoryName: newMainName.trim() })
+            });
+            if (res.ok) {
+                const created = await res.json();
+                toast.success('Main category created');
+                await fetchCategories();
+                setFormData(prev => ({ ...prev, mainCategoryId: String(created.mainCategoryId), subCategoryId: '' }));
+                setShowAddMain(false);
+                setNewMainName('');
+            } else {
+                toast.error('Failed to create');
+            }
+        } catch {
+            toast.error('Server error');
+        } finally {
+            setAddingMain(false);
+        }
+    };
+
+    const handleAddSubCategory = async () => {
+        if (!newSubName.trim() || !formData.mainCategoryId) {
+            if (!formData.mainCategoryId) toast.error('Select a Main Category first');
+            return;
+        }
+        setAddingSub(true);
+        try {
+            const res = await fetch('/api/admin/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'sub', categoryName: newSubName.trim(), mainCategoryId: Number(formData.mainCategoryId) })
+            });
+            if (res.ok) {
+                const created = await res.json();
+                toast.success('Sub category created');
+                await fetchCategories();
+                setFormData(prev => ({ ...prev, subCategoryId: String(created.subCategoryId) }));
+                setShowAddSub(false);
+                setNewSubName('');
+            } else {
+                toast.error('Failed to create');
+            }
+        } catch {
+            toast.error('Server error');
+        } finally {
+            setAddingSub(false);
         }
     };
 
@@ -278,33 +340,105 @@ const ProductsPage = () => {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Main Category</label>
-                                            <select
-                                                required
-                                                className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={formData.mainCategoryId}
-                                                onChange={e => setFormData({ ...formData, mainCategoryId: e.target.value, subCategoryId: '' })}
-                                            >
-                                                <option value="">Select Category</option>
-                                                {mainCategories.map(c => (
-                                                    <option key={c.mainCategoryId} value={c.mainCategoryId}>{c.categoryName}</option>
-                                                ))}
-                                            </select>
+                                            <div className="flex gap-2">
+                                                <select
+                                                    required
+                                                    className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
+                                                    value={formData.mainCategoryId}
+                                                    onChange={e => setFormData({ ...formData, mainCategoryId: e.target.value, subCategoryId: '' })}
+                                                >
+                                                    <option value="">Select Category</option>
+                                                    {mainCategories.map(c => (
+                                                        <option key={c.mainCategoryId} value={c.mainCategoryId}>{c.categoryName}</option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowAddMain(true)}
+                                                    className="px-3 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-2xl transition-all shrink-0"
+                                                    title="Add Main Category"
+                                                >
+                                                    <Plus size={18} />
+                                                </button>
+                                            </div>
+                                            {showAddMain && (
+                                                <div className="flex gap-2 mt-2">
+                                                    <input
+                                                        className="flex-1 px-3 py-2 bg-white border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                                                        placeholder="New category name..."
+                                                        value={newMainName}
+                                                        onChange={e => setNewMainName(e.target.value)}
+                                                        autoFocus
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddMainCategory}
+                                                        disabled={addingMain || !newMainName.trim()}
+                                                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                                                    >
+                                                        {addingMain ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setShowAddMain(false); setNewMainName(''); }}
+                                                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition-all"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Sub Category</label>
-                                            <select
-                                                required
-                                                className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={formData.subCategoryId}
-                                                onChange={e => setFormData({ ...formData, subCategoryId: e.target.value })}
-                                            >
-                                                <option value="">Select Sub</option>
-                                                {subCategories
-                                                    .filter(s => !formData.mainCategoryId || s.mainCategoryId === Number(formData.mainCategoryId))
-                                                    .map(s => (
-                                                    <option key={s.subCategoryId} value={s.subCategoryId}>{s.subCategoryName}</option>
-                                                ))}
-                                            </select>
+                                            <div className="flex gap-2">
+                                                <select
+                                                    required
+                                                    className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
+                                                    value={formData.subCategoryId}
+                                                    onChange={e => setFormData({ ...formData, subCategoryId: e.target.value })}
+                                                >
+                                                    <option value="">Select Sub</option>
+                                                    {subCategories
+                                                        .filter(s => !formData.mainCategoryId || s.mainCategoryId === Number(formData.mainCategoryId))
+                                                        .map(s => (
+                                                        <option key={s.subCategoryId} value={s.subCategoryId}>{s.subCategoryName}</option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowAddSub(true)}
+                                                    className="px-3 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-2xl transition-all shrink-0"
+                                                    title="Add Sub Category"
+                                                >
+                                                    <Plus size={18} />
+                                                </button>
+                                            </div>
+                                            {showAddSub && (
+                                                <div className="flex gap-2 mt-2">
+                                                    <input
+                                                        className="flex-1 px-3 py-2 bg-white border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                                                        placeholder="New sub category name..."
+                                                        value={newSubName}
+                                                        onChange={e => setNewSubName(e.target.value)}
+                                                        autoFocus
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddSubCategory}
+                                                        disabled={addingSub || !newSubName.trim()}
+                                                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                                                    >
+                                                        {addingSub ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setShowAddSub(false); setNewSubName(''); }}
+                                                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition-all"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

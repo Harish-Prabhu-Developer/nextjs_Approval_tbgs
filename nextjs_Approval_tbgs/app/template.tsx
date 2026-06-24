@@ -110,7 +110,9 @@ export default function Template({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        const dynamicItems = (cards || []).map((card: any) => ({
+        const dynamicItems = (cards || [])
+            .filter((card: any) => !card.parentId) // Only top-level cards in sidebar
+            .map((card: any) => ({
             id: `approval-${card.sno}`,
             name: card.cardTitle,
             pendingCount: getPendingCount(card.permissionColumn, `/${card.routeSlug}`),

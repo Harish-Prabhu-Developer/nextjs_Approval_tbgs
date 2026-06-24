@@ -15,7 +15,7 @@ export async function PUT(
         const updatedUser = await db.update(users)
             .set({
                 username,
-                password, // Should be hashed
+                password,
                 name,
                 role,
                 email,

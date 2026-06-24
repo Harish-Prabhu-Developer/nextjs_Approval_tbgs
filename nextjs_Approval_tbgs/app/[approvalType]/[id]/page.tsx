@@ -5,8 +5,6 @@ import { useRouter, useParams } from "next/navigation";
 import { Download, AlertCircle, ArrowLeft, Loader2, FileText } from "lucide-react";
 import ExpandableText from "@/app/components/ExpandableText";
 
-
-import { DASHBOARD_CARDS } from "../../config/mockData";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { fetchApprovalDetail, clearCurrentRecord } from "@/redux/slices/approvalSlice";
 
@@ -53,8 +51,6 @@ const ViewDetailPage = ({ searchParams }: ViewDetailPageProps) => {
 
     const pageTitle = React.useMemo(() => {
         if (queryParams.cardTitle) return queryParams.cardTitle;
-        const card = DASHBOARD_CARDS.find(c => c.routeSlug === approvalType);
-        if (card) return card.cardTitle;
         return approvalType?.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
     }, [approvalType, queryParams]);
 

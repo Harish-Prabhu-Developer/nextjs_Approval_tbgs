@@ -1,31 +1,90 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { dashboardCards } from '@/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id } = await params;
+    const cardId = Number(id);
     try {
         const body = await request.json();
-        const { cardTitle, permissionColumn, routeSlug, approvalType, iconKey, backgroundColor, parentId } = body;
+        const { cardTitle, permissionColumn, routeSlug, approvalType, iconKey, backgroundColor, parentId, childIds } = body;
 
-        const updatedCard = await db.update(dashboardCards)
-            .set({
-                cardTitle,
-                permissionColumn,
-                routeSlug,
-                approvalType,
-                iconKey,
-                backgroundColor,
-                parentId: parentId || null,
-            })
-            .where(eq(dashboardCards.sno, Number(id)))
-            .returning();
+        const updateFields: Record<string, any> = {
+            cardTitle,
+            permissionColumn,
+            routeSlug,
+            approvalType,
+            iconKey,
+            backgroundColor,
+        };
 
-        return NextResponse.json(updatedCard[0]);
+        if ('parentId' in body) {
+            updateFields.parentId = parentId || null;
+        }
+
+        await db.update(dashboardCards)
+            .set(updateFields)
+            .where(eq(dashboardCards.sno, cardId));
+
+        if (Array.isArray(childIds)) {
+            if (childIds.includes(cardId)) {
+                return NextResponse.json(
+                    { message: 'A card cannot be a sub-approval of itself' },
+                    { status: 400 }
+                );
+            }
+
+            const existingChildren = await db.select({ sno: dashboardCards.sno })
+                .from(dashboardCards)
+                .where(eq(dashboardCards.parentId, cardId));
+            const existingChildIds = existingChildren.map(c => c.sno);
+
+            let current = cardId;
+            while (current) {
+                const rows = await db.select({ sno: dashboardCards.sno, parentId: dashboardCards.parentId })
+                    .from(dashboardCards)
+                    .where(eq(dashboardCards.sno, current))
+                    .limit(1);
+                if (rows.length === 0 || rows[0].parentId === null) break;
+                const ancestorId = rows[0].parentId;
+                if (childIds.includes(ancestorId)) {
+                    const ancestor = await db.select({ cardTitle: dashboardCards.cardTitle })
+                        .from(dashboardCards)
+                        .where(eq(dashboardCards.sno, ancestorId))
+                        .limit(1);
+                    return NextResponse.json(
+                        { message: `Circular reference: "${ancestor[0]?.cardTitle}" is already an ancestor of this card.` },
+                        { status: 400 }
+                    );
+                }
+                current = ancestorId;
+            }
+
+            const toRemove = existingChildIds.filter(id => !childIds.includes(id));
+            for (const removeId of toRemove) {
+                await db.update(dashboardCards)
+                    .set({ parentId: null })
+                    .where(eq(dashboardCards.sno, removeId));
+            }
+
+            const toAdd = childIds.filter((id: number) => !existingChildIds.includes(id));
+            for (const addId of toAdd) {
+                await db.update(dashboardCards)
+                    .set({ parentId: cardId })
+                    .where(eq(dashboardCards.sno, addId));
+            }
+        }
+
+        const updatedCard = await db.select()
+            .from(dashboardCards)
+            .where(eq(dashboardCards.sno, cardId))
+            .limit(1);
+
+        return NextResponse.json(updatedCard[0] || null);
     } catch (error) {
         console.error('Error updating dashboard card:', error);
         return NextResponse.json({ message: 'Error updating dashboard card' }, { status: 500 });

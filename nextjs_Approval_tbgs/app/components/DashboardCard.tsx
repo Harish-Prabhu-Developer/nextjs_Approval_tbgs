@@ -10,6 +10,7 @@ interface DashboardCardProps {
         iconKey: string;
         routeSlug: string;
         backgroundColor?: string;
+        childCount?: number;
     };
     onClick: () => void;
 }
@@ -47,6 +48,14 @@ const DashboardCard: React.FC<DashboardCardProps> = ({ card, onClick }) => {
             className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer relative group hover:-translate-y-1"
         >
             <div className="absolute top-0 left-0 h-1 w-full bg-indigo-600 rounded-t-xl" />
+
+            {/* Child count badge */}
+            {card.childCount && card.childCount > 0 && (
+                <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-black shadow-sm">
+                    <Icons.Layers size={12} />
+                    <span>{card.childCount} sub</span>
+                </div>
+            )}
 
             <div className="p-6 text-center">
                 <div className="flex justify-center mb-4">

@@ -1,20 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "./index";
 import * as schema from "./schema";
-import { 
-  COMPANY_MASTER, 
-  SUPPLIER_MASTER, 
-  STORE_MASTER, 
-  MAIN_CATEGORY_MASTER, 
-  SUB_CATEGORY_MASTER, 
-  PRODUCT_MASTER,
-  DASHBOARD_CARDS,
-  MOCK_APPROVAL_DATA,
-  PURCHASE_ORDER_DTL,
-  PURCHASE_ORDER_ADDITIONAL_COST_DETAILS,
-  PURCHASE_ORDER_CONVERSATION_DTL,
-  PURCHASE_ORDER_FILES_UPLOAD
-} from "../app/config/mockData";
 
 async function main() {
   console.log("Seeding database...");
@@ -80,16 +66,47 @@ async function main() {
 
   // 2. Dashboard Cards
   console.log("Seeding dashboard cards...");
-  await db.insert(schema.dashboardCards).values(
-    DASHBOARD_CARDS.map(card => ({
-      ...card,
-      approvalType: card.routeSlug
-    }))
-  );
-
-  // 2b. Sub-approvals: Employee module with children
-  console.log("Seeding sub-approval cards...");
   await db.insert(schema.dashboardCards).values([
+    {
+      sno: 1,
+      cardTitle: "Purchase Order Approvals",
+      permissionColumn: "poApproval",
+      routeSlug: "purchase-order",
+      approvalType: "purchase-order",
+      iconKey: "ShoppingCart",
+      backgroundColor: "indigo",
+      parentId: null,
+    },
+    {
+      sno: 2,
+      cardTitle: "Work Order Approvals",
+      permissionColumn: "workOrderApproval",
+      routeSlug: "work-order",
+      approvalType: "work-order",
+      iconKey: "Briefcase",
+      backgroundColor: "emerald",
+      parentId: null,
+    },
+    {
+      sno: 3,
+      cardTitle: "Price Approvals",
+      permissionColumn: "priceApproval",
+      routeSlug: "price-approval",
+      approvalType: "price-approval",
+      iconKey: "LayoutDashboard",
+      backgroundColor: "amber",
+      parentId: null,
+    },
+    {
+      sno: 4,
+      cardTitle: "Sales Return Approvals",
+      permissionColumn: "salesReturnApproval",
+      routeSlug: "sales-return-approval",
+      approvalType: "sales-return-approval",
+      iconKey: "LayoutDashboard",
+      backgroundColor: "rose",
+      parentId: null,
+    },
     {
       sno: 5,
       cardTitle: "Employee Approvals",
@@ -128,140 +145,6 @@ async function main() {
       permissions: ["priceApproval", "poApproval", "workOrderApproval", "salesReturnApproval", "employeeApproval", "leaveApproval", "salaryApproval"]
     })
     .where(eq(schema.users.id, 4));
-
-  // 3. Companies
-  console.log("Seeding companies...");
-  await db.insert(schema.companies).values(COMPANY_MASTER);
-
-  // 4. Suppliers
-  console.log("Seeding suppliers...");
-  await db.insert(schema.suppliers).values(SUPPLIER_MASTER);
-
-  // 5. Stores
-  console.log("Seeding stores...");
-  await db.insert(schema.stores).values(STORE_MASTER);
-
-  // 6. Main Categories
-  console.log("Seeding main categories...");
-  await db.insert(schema.mainCategories).values(MAIN_CATEGORY_MASTER);
-
-  // 7. Sub Categories
-  console.log("Seeding sub categories...");
-  await db.insert(schema.subCategories).values(SUB_CATEGORY_MASTER);
-
-  // 8. Products
-  console.log("Seeding products...");
-  await db.insert(schema.products).values(PRODUCT_MASTER);
-
-  // 9. Purchase Order headers
-  console.log("Seeding purchase order headers...");
-  const poData = MOCK_APPROVAL_DATA["purchase-order"];
-  if (poData && poData.length > 0) {
-    await db.insert(schema.purchaseOrderHdr).values(
-      poData.map(po => ({
-        sno: po.sno,
-        poRefNo: po.poRefNo,
-        poDate: new Date(po.poDate),
-        purchaseType: po.purchaseType,
-        companyId: po.companyId,
-        supplierId: po.supplierId,
-        poStoreId: po.poStoreId,
-        remarks: po.remarks,
-        statusEntry: po.statusEntry,
-        totalFinalProductionHdrAmount: po.totalFinalProductionHdrAmount.toString(),
-        currencyType: po.currencyType,
-        requestedBy: po.requestedBy,
-        finalResponseStatus: po.finalResponseStatus,
-      }))
-    );
-  }
-
-  // 10. Approval Requests (Other types)
-  console.log("Seeding other approval requests...");
-  const otherTypes = ["work-order", "price-approval", "sales-return-approval"];
-  for (const type of otherTypes) {
-    const data = MOCK_APPROVAL_DATA[type];
-    if (data && data.length > 0) {
-      await db.insert(schema.approvalRequests).values(
-        data.map(req => ({
-          sno: req.sno,
-          approvalType: type,
-          poRefNo: req.poRefNo,
-          poDate: new Date(req.poDate),
-          purchaseType: req.purchaseType || "GENERIC",
-          companyId: req.companyId,
-          supplierId: req.supplierId,
-          poStoreId: req.poStoreId,
-          remarks: req.remarks,
-          statusEntry: req.statusEntry,
-          totalFinalProductionHdrAmount: req.totalFinalProductionHdrAmount ? req.totalFinalProductionHdrAmount.toString() : "0",
-          currencyType: req.currencyType || "USD",
-          requestedBy: req.requestedBy,
-          finalResponseStatus: req.finalResponseStatus || "PENDING",
-        }))
-      );
-    }
-  }
-
-  // 11. Purchase Order Details
-  console.log("Seeding purchase order details...");
-  const allPoDetails = PURCHASE_ORDER_DTL.map(d => ({
-    sno: d.sno,
-    poRefNo: d.poRefNo,
-    productId: d.productId,
-    finalProductAmount: d.finalProductAmount ? d.finalProductAmount.toString() : "0",
-    totalPcs: d.totalPcs ? d.totalPcs.toString() : "0",
-    ratePerPcs: d.ratePerPcs ? d.ratePerPcs.toString() : "0",
-    remarks: d.remarks
-  }));
-  if (allPoDetails.length > 0) {
-    await db.insert(schema.purchaseOrderDtl).values(allPoDetails);
-  }
-
-  // 12. Additional Costs
-  console.log("Seeding additional costs...");
-  const allCosts = PURCHASE_ORDER_ADDITIONAL_COST_DETAILS.map(c => ({
-    sno: c.sno,
-    poRefNo: c.poRefNo,
-    additionalCostType: c.additionalCostType,
-    amount: c.amount ? c.amount.toString() : "0"
-  }));
-  if (allCosts.length > 0) {
-    await db.insert(schema.purchaseOrderAdditionalCosts).values(allCosts);
-  }
-
-  // 13. Conversations
-  console.log("Seeding conversations...");
-  const allConvs = PURCHASE_ORDER_CONVERSATION_DTL.map(c => ({
-    sno: c.sno,
-    poRefNo: c.poRefNo,
-    respondPerson: c.respondPerson,
-    discussionDetails: c.discussionDetails,
-    responseStatus: c.responseStatus,
-    statusEntry: c.statusEntry,
-    remarks: c.remarks,
-    createdBy: c.createdBy,
-    createdDate: new Date(c.createdDate)
-  }));
-  if (allConvs.length > 0) {
-    await db.insert(schema.purchaseOrderConversation).values(allConvs);
-  }
-
-  // 14. Files
-  console.log("Seeding files...");
-  if (PURCHASE_ORDER_FILES_UPLOAD && PURCHASE_ORDER_FILES_UPLOAD.length > 0) {
-    await db.insert(schema.purchaseOrderFiles).values(
-      PURCHASE_ORDER_FILES_UPLOAD.map(f => ({
-        sno: f.sno,
-        poRefNo: f.poRefNo,
-        descriptionDetails: f.descriptionDetails,
-        fileName: f.fileName,
-        fileType: f.fileType,
-        contentType: f.contentType,
-        contentData: f.contentData
-      }))
-    );
-  }
 
   console.log("Seeding completed successfully.");
   process.exit(0);

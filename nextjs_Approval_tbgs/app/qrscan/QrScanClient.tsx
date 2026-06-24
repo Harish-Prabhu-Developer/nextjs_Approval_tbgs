@@ -3,16 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Check, Copy, RefreshCw, X, AlertCircle, ExternalLink } from 'lucide-react';
-import {
-    MOCK_APPROVAL_DATA,
-    INVOICE_TEMPLATE_DATA,
-    PURCHASE_ORDER_DTL,
-    PURCHASE_ORDER_ADDITIONAL_COST_DETAILS,
-    PRODUCT_MASTER,
-    SUPPLIER_MASTER,
-    COMPANY_MASTER,
-    STORE_MASTER
-} from '@/app/config/mockData';
 import toast from 'react-hot-toast';
 
 interface QrScanClientProps {
@@ -68,81 +58,47 @@ export default function QrScanClient({ initialId, initialIsValid }: QrScanClient
     const handleOpenLink = async () => {
         if (!id) return;
 
-        // If it's a direct URL, open it
         if (id.startsWith('http://') || id.startsWith('https://')) {
             window.open(id, '_blank', 'noopener,noreferrer');
             return;
         }
 
-        // 1. Find the record in MOCK_APPROVAL_DATA
-        const normalize = (str: string) => str.replace(/-/g, '/').toUpperCase();
-        let record: any = null;
+        // 1. Try to find the record from the live API
+        const approvalTypes = ['purchase-order', 'work-order', 'price-approval', 'sales-return-approval'];
+        let foundRecord: any = null;
+        let foundType = '';
 
-        for (const items of Object.values(MOCK_APPROVAL_DATA)) {
-            const found = items.find(item => item.poRefNo && normalize(item.poRefNo) === normalize(id));
-            if (found) {
-                record = found;
-                break;
-            }
+        for (const type of approvalTypes) {
+            try {
+                const res = await fetch(`/api/approvals/${type}`);
+                const records = await res.json();
+                const normalize = (str: string) => str.replace(/-/g, '/').toUpperCase();
+                const match = (records || []).find((r: any) => r.poRefNo && normalize(r.poRefNo) === normalize(id));
+                if (match) {
+                    foundRecord = match;
+                    foundType = type;
+                    break;
+                }
+            } catch { /* skip */ }
         }
 
-        if (!record) {
+        if (!foundRecord) {
             alert('Record not found or invalid ID');
             return;
         }
 
-        // 2. Build PDF Template (Copied logic from page.tsx)
-        const buildTemplateFromRow = (poRow: any) => {
-            const lineItems = PURCHASE_ORDER_DTL
-                .filter((item: any) => item.poRefNo === poRow.poRefNo)
-                .map((item: any) => {
-                    const product = item.productId
-                        ? PRODUCT_MASTER.find((p: any) => p.productId === item.productId)
-                        : undefined;
-                    const qty = Number(item.totalPcs ?? item.totalPacking ?? 0);
-                    const unitPrice = Number(item.ratePerPcs ?? 0);
-                    const amount = Number(item.totalProductAmount ?? item.productAmount ?? item.finalProductAmount ?? qty * unitPrice);
+        // 2. Fetch full detail from the detail endpoint
+        let detail: any;
+        try {
+            const res = await fetch(`/api/approvals/${foundType}/${foundRecord.sno}`);
+            if (!res.ok) throw new Error('Failed to fetch detail');
+            detail = await res.json();
+        } catch {
+            alert('Failed to load record details');
+            return;
+        }
 
-                    return {
-                        ...item,
-                        productName: product?.productName || item.alternateProductName || `Product ${item.productId ?? ""}`.trim(),
-                        specification: product?.specification || item.remarks || "-",
-                        orderedQty: qty,
-                        unitPrice,
-                        amount
-                    };
-                });
-
-            const additionalCosts = PURCHASE_ORDER_ADDITIONAL_COST_DETAILS
-                .filter((cost: any) => cost.poRefNo === poRow.poRefNo && cost.statusMaster === "ACTIVE")
-                .map((cost: any) => ({
-                    ...cost,
-                    costType: cost.additionalCostType || "ADDITIONAL_COST",
-                    vatAmount: Number(cost.vatAmount ?? 0)
-                }));
-
-            const subtotal = lineItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
-            const addCostTotal = additionalCosts.reduce((sum: number, cost: any) => sum + Number(cost.amount || 0), 0);
-            const vat = Number(poRow.vatHdrAmount ?? 0);
-            const total = Number(poRow.totalFinalProductionHdrAmount ?? subtotal + addCostTotal + vat);
-
-            return {
-                header: {
-                    poRefNo: poRow.poRefNo,
-                    poDate: String(poRow.poDate || poRow.createdDate || "").split(" ")[0] || "-",
-                    supplier: SUPPLIER_MASTER.find((s: any) => s.supplierId === poRow.supplierId),
-                    company: COMPANY_MASTER.find((c: any) => c.companyId === poRow.companyId),
-                    store: STORE_MASTER.find((s: any) => s.storeId === poRow.poStoreId)
-                },
-                lineItems,
-                additionalCosts,
-                totals: { subtotal, additionalCosts: addCostTotal, vat, total }
-            };
-        };
-
-        const template = (INVOICE_TEMPLATE_DATA as Record<string, any>)[record.poRefNo] || buildTemplateFromRow(record);
-
-        // 3. Generate PDF
+        // 3. Generate PDF from the live detail data
         try {
             const [{ jsPDF }, autoTableModule] = await Promise.all([
                 import("jspdf"),
@@ -155,18 +111,40 @@ export default function QrScanClient({ initialId, initialIsValid }: QrScanClient
             const margin = 12;
             const right = pageWidth - margin;
 
-            const header = template.header || {};
-            const supplier = header.supplier || {};
-            const company = header.company || {};
-            const store = header.store || {};
-            const lineItems: any[] = template.lineItems || [];
-            const additionalCosts: any[] = template.additionalCosts || [];
-            const totals = template.totals || {};
+            const lineItems: any[] = (detail?.productLineItems || []).map((item: any) => {
+                const qty = Number(item.totalPcs ?? item.totalPacking ?? item.orderedQty ?? 0);
+                const unitPrice = Number(item.ratePerPcs ?? item.unitPrice ?? 0);
+                const amount = Number(item.totalProductAmount ?? item.productAmount ?? item.finalProductAmount ?? item.amount ?? (qty * unitPrice));
+                return {
+                    ...item,
+                    productName: item.productName || item.alternateProductName || `Product ${item.productId ?? ''}`.trim(),
+                    specification: item.specification || item.remarks || '-',
+                    orderedQty: qty,
+                    unitPrice,
+                    amount
+                };
+            });
+
+            const additionalCosts: any[] = (detail?.additionalCosts || [])
+                .filter((cost: any) => cost.statusMaster === 'ACTIVE')
+                .map((cost: any) => ({
+                    ...cost,
+                    costType: cost.additionalCostType || 'ADDITIONAL_COST',
+                    vatAmount: Number(cost.vatAmount ?? 0)
+                }));
+
+            const supplier = detail?.supplier || {};
+            const company = detail?.company || {};
+            const store = detail?.store || {};
+
+            const subtotal = lineItems.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+            const addCostTotal = additionalCosts.reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
+            const vat = Number(foundRecord.vatHdrAmount ?? 0);
+            const total = Number(foundRecord.totalFinalProductionHdrAmount ?? subtotal + addCostTotal + vat);
 
             const fmt = (value: any) => Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            // Add QR Code back exactly as it appears in the main invoice
-            const qrContent = `${process.env.NEXT_PUBLIC_APP_URL}qrscan?id=%22${header.poRefNo}%22`;
+            const qrContent = `${process.env.NEXT_PUBLIC_APP_URL}qrscan?id=%22${foundRecord.poRefNo}%22`;
             const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrContent)}`;
 
             try {
@@ -178,9 +156,7 @@ export default function QrScanClient({ initialId, initialIsValid }: QrScanClient
                     img.src = qrApiUrl;
                 });
                 doc.addImage(qrImg, "PNG", right - 25, 8, 25, 25);
-            } catch (e) {
-                console.error("QR insertion skipped in PDF", e);
-            }
+            } catch { /* skip */ }
 
             doc.setFont("helvetica", "bold");
             doc.setFontSize(16);
@@ -188,8 +164,8 @@ export default function QrScanClient({ initialId, initialIsValid }: QrScanClient
 
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9);
-            doc.text(`PO Ref: ${header.poRefNo || record.poRefNo || "-"}`, margin, 21);
-            doc.text(`PO Date: ${header.poDate || "-"}`, margin, 26);
+            doc.text(`PO Ref: ${foundRecord.poRefNo || "-"}`, margin, 21);
+            doc.text(`PO Date: ${foundRecord.poDate ? new Date(foundRecord.poDate).toLocaleDateString() : "-"}`, margin, 26);
             doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, 31);
 
             doc.setFont("helvetica", "bold");
@@ -239,17 +215,16 @@ export default function QrScanClient({ initialId, initialIsValid }: QrScanClient
                 startY: costsEndY + 6,
                 margin: { left: right - 78 },
                 body: [
-                    ["Subtotal", fmt(totals.subtotal)],
-                    ["Additional Costs", fmt(totals.additionalCosts)],
-                    ["VAT", fmt(totals.vat)],
-                    ["Total", fmt(totals.total)]
+                    ["Subtotal", fmt(subtotal)],
+                    ["Additional Costs", fmt(addCostTotal)],
+                    ["VAT", fmt(vat)],
+                    ["Total", `${fmt(total)} ${foundRecord.currencyType || 'TZS'}`]
                 ],
                 theme: "grid",
                 styles: { fontSize: 9, cellPadding: 2.5 },
                 columnStyles: { 0: { fontStyle: "bold", cellWidth: 45 }, 1: { halign: "right", cellWidth: 33 } }
             });
 
-            // Open in new tab
             const pdfBlob = doc.output('blob');
             const pdfUrl = URL.createObjectURL(pdfBlob);
             window.open(pdfUrl, '_blank');
