@@ -130,6 +130,13 @@ const ApprovalsManagementPage = () => {
         backgroundColor: 'indigo',
         childIds: [] as number[]
     });
+
+    useEffect(() => {
+        if (formData.routeSlug && formData.routeSlug !== formData.approvalType && !currentApproval) {
+            setFormData(prev => prev.routeSlug !== prev.approvalType ? { ...prev, approvalType: prev.routeSlug } : prev);
+        }
+    }, [formData.routeSlug, formData.approvalType, currentApproval]);
+
     const [childSearch, setChildSearch] = useState('');
 
     const emptyLineItem = () => ({
@@ -532,39 +539,42 @@ const ApprovalsManagementPage = () => {
 
     // --- Product line item helpers ---
     const handleLineItemChange = (index: number, field: string, value: string) => {
-        const items = [...requestData.productLineItems];
-        items[index] = { ...items[index], [field]: value };
+        setRequestData(prev => {
+            const items = [...prev.productLineItems];
+            items[index] = { ...items[index], [field]: value };
 
-        // Auto-calc amount when product, qty or price changes
-        if (field === 'productId') {
-            const product = getProductName(value);
-            if (product) {
-                items[index].productName = product.productName || '';
-                items[index].specification = product.specification || '';
+            if (field === 'productId') {
+                const product = getProductName(value);
+                if (product) {
+                    items[index].productName = product.productName || '';
+                    items[index].specification = product.specification || '';
+                }
             }
-        }
-        if (field === 'orderedQty' || field === 'unitPrice') {
-            const qty = parseFloat(items[index].orderedQty) || 0;
-            const price = parseFloat(items[index].unitPrice) || 0;
-            items[index].amount = (qty * price).toFixed(2);
-        }
-        // Update total amount sum
-        const total = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-        setRequestData({ ...requestData, productLineItems: items, totalAmount: total.toFixed(2) });
-    };
+            if (field === 'orderedQty' || field === 'unitPrice') {
+                const qty = parseFloat(items[index].orderedQty) || 0;
+                const price = parseFloat(items[index].unitPrice) || 0;
+                items[index].amount = (qty * price).toFixed(2);
+            }
 
-    const addLineItem = () => {
-        setRequestData({
-            ...requestData,
-            productLineItems: [...requestData.productLineItems, emptyLineItem()]
+            const total = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            return { ...prev, productLineItems: items, totalAmount: total.toFixed(2) };
         });
     };
 
+    const addLineItem = () => {
+        setRequestData(prev => ({
+            ...prev,
+            productLineItems: [...prev.productLineItems, emptyLineItem()]
+        }));
+    };
+
     const removeLineItem = (index: number) => {
-        if (requestData.productLineItems.length <= 1) return;
-        const items = requestData.productLineItems.filter((_, i) => i !== index);
-        const total = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-        setRequestData({ ...requestData, productLineItems: items, totalAmount: total.toFixed(2) });
+        setRequestData(prev => {
+            if (prev.productLineItems.length <= 1) return prev;
+            const items = prev.productLineItems.filter((_, i) => i !== index);
+            const total = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            return { ...prev, productLineItems: items, totalAmount: total.toFixed(2) };
+        });
     };
 
     // --- Table columns ---
@@ -1279,17 +1289,6 @@ const ApprovalsManagementPage = () => {
                                             <input required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-medium" placeholder="purchase-order" value={formData.routeSlug} onChange={e => setFormData({ ...formData, routeSlug: e.target.value })} />
                                         </div>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Linked Approval Type</label>
-                                        <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                            value={formData.approvalType} onChange={e => setFormData({ ...formData, approvalType: e.target.value })}>
-                                            <option value="">— Select an approval type —</option>
-                                            {Array.from(new Set(approvals.map(a => a.approvalType))).map(type => (
-                                                <option key={type} value={type}>{type}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
                                     {formData.cardType === 'sub-approval' ? (
                                         /* Sub Approval: select parent card */
                                         <div className="space-y-1.5">
@@ -1412,20 +1411,25 @@ const ApprovalsManagementPage = () => {
 
                                 <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                        <div className="space-y-1.5 col-span-1">
+                                        <div className="space-y-1.5 sm:col-span-2">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Approval Category</label>
                                             <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.approvalType} onChange={e => setRequestData({ ...requestData, approvalType: e.target.value })}>
-                                                <option value="">Select Category</option>
-                                                {Array.isArray(approvals) && approvals.map(app => (
-                                                    <option key={app.sno} value={app.approvalType}>{app.cardTitle}</option>
+                                                value={requestData.approvalType} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, approvalType: v })); }}>
+                                                <option value="">— Select Category —</option>
+                                                {Array.isArray(approvals) && approvals.filter(a => !a.parentId).map(parent => (
+                                                    <optgroup key={parent.sno} label={parent.cardTitle}>
+                                                        <option value={parent.approvalType}>{parent.cardTitle}</option>
+                                                        {approvals.filter(c => c.parentId === parent.sno).map(child => (
+                                                            <option key={child.sno} value={child.approvalType}>&nbsp;&nbsp;&nbsp;━ {child.cardTitle}</option>
+                                                        ))}
+                                                    </optgroup>
                                                 ))}
                                             </select>
                                         </div>
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Reference Number</label>
                                             <input type="text" required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
-                                                placeholder="e.g. PO/2025/001" value={requestData.poRefNo} onChange={e => setRequestData({ ...requestData, poRefNo: e.target.value })} />
+                                                placeholder="e.g. PO/2025/001" value={requestData.poRefNo} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, poRefNo: v })); }} />
                                         </div>
                                     </div>
 
@@ -1433,7 +1437,7 @@ const ApprovalsManagementPage = () => {
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Purchase Type</label>
                                             <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.purchaseType} onChange={e => setRequestData({ ...requestData, purchaseType: e.target.value })}>
+                                                value={requestData.purchaseType} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, purchaseType: v })); }}>
                                                 <option value="LOCAL">Local Purchase</option>
                                                 <option value="IMPORT">Import / International</option>
                                             </select>
@@ -1441,7 +1445,7 @@ const ApprovalsManagementPage = () => {
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">PO Date</label>
                                             <input type="date" required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
-                                                value={requestData.poDate} onChange={e => setRequestData({ ...requestData, poDate: e.target.value })} />
+                                                value={requestData.poDate} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, poDate: v })); }} />
                                         </div>
                                     </div>
 
@@ -1449,7 +1453,7 @@ const ApprovalsManagementPage = () => {
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Company</label>
                                             <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.companyId} onChange={e => setRequestData({ ...requestData, companyId: e.target.value })}>
+                                                value={requestData.companyId} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, companyId: v })); }}>
                                                 <option value="">Select Company</option>
                                                 {Array.isArray(companies) && companies.map(c => (
                                                     <option key={c.companyId} value={c.companyId}>{c.companyName}</option>
@@ -1459,7 +1463,7 @@ const ApprovalsManagementPage = () => {
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Supplier</label>
                                             <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.supplierId} onChange={e => setRequestData({ ...requestData, supplierId: e.target.value })}>
+                                                value={requestData.supplierId} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, supplierId: v })); }}>
                                                 <option value="">Select Supplier</option>
                                                 {Array.isArray(suppliers) && suppliers.map(s => (
                                                     <option key={s.supplierId} value={s.supplierId}>{s.supplierName}</option>
@@ -1473,7 +1477,7 @@ const ApprovalsManagementPage = () => {
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Department / Store</label>
                                             <div className="flex gap-2">
                                                 <select required className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                    value={requestData.poStoreId} onChange={e => setRequestData({ ...requestData, poStoreId: e.target.value })}>
+                                                    value={requestData.poStoreId} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, poStoreId: v })); }}>
                                                     <option value="">Select Department</option>
                                                     {Array.isArray(stores) && stores.map(s => (
                                                         <option key={s.storeId} value={s.storeId}>{s.storeName}</option>
@@ -1537,7 +1541,7 @@ const ApprovalsManagementPage = () => {
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Currency</label>
                                             <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.currencyType} onChange={e => setRequestData({ ...requestData, currencyType: e.target.value })}>
+                                                value={requestData.currencyType} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, currencyType: v })); }}>
                                                 <option value="TZS">TZS - Tanzanian Shilling</option>
                                                 <option value="USD">USD - US Dollar</option>
                                                 <option value="AED">AED - UAE Dirham</option>
@@ -1552,7 +1556,7 @@ const ApprovalsManagementPage = () => {
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Truck</label>
                                             <select className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.truckId} onChange={e => setRequestData({ ...requestData, truckId: e.target.value })}>
+                                                value={requestData.truckId} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, truckId: v })); }}>
                                                 <option value="">Select Truck</option>
                                                 {Array.isArray(trucks) && trucks.map(t => (
                                                     <option key={t.truckId} value={t.truckId}>{t.truckNumber}</option>
@@ -1562,7 +1566,7 @@ const ApprovalsManagementPage = () => {
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Trailer</label>
                                             <select className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.trailerId} onChange={e => setRequestData({ ...requestData, trailerId: e.target.value })}>
+                                                value={requestData.trailerId} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, trailerId: v })); }}>
                                                 <option value="">Select Trailer</option>
                                                 {Array.isArray(trailers) && trailers.map(t => (
                                                     <option key={t.trailerId} value={t.trailerId}>{t.trailerNumber}</option>
@@ -1648,7 +1652,7 @@ const ApprovalsManagementPage = () => {
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Current Status</label>
                                             <select required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700"
-                                                value={requestData.statusEntry} onChange={e => setRequestData({ ...requestData, statusEntry: e.target.value })}>
+                                                value={requestData.statusEntry} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, statusEntry: v })); }}>
                                                 <option value="PENDING">Pending Review</option>
                                                 <option value="APPROVED">Approved</option>
                                                 <option value="REJECTED">Rejected</option>
@@ -1662,7 +1666,7 @@ const ApprovalsManagementPage = () => {
                                             <div className="relative">
                                                 <Icons.User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                                 <input type="text" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
-                                                    value={requestData.requestedBy} onChange={e => setRequestData({ ...requestData, requestedBy: e.target.value })} />
+                                                    value={requestData.requestedBy} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, requestedBy: v })); }} />
                                             </div>
                                         </div>
                                     </div>
@@ -1671,7 +1675,7 @@ const ApprovalsManagementPage = () => {
                                         <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 ml-1">Remarks / Justification</label>
                                         <textarea className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 font-bold min-h-[100px]"
                                             placeholder="Enter detailed justification for this approval request..."
-                                            value={requestData.remarks} onChange={e => setRequestData({ ...requestData, remarks: e.target.value })} />
+                                            value={requestData.remarks} onChange={e => { const v = e.target.value; setRequestData(prev => ({ ...prev, remarks: v })); }} />
                                     </div>
                                 </div>
 

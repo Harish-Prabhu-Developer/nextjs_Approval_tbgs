@@ -641,9 +641,14 @@ const ApprovalDetailsPage = ({ searchParams }: ApprovalDetailsPageProps) => {
                                 <button
                                     key={child.routeSlug}
                                     onClick={() => router.push(`/${child.routeSlug}`)}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all"
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all flex items-center gap-2"
                                 >
                                     {child.cardTitle}
+                                    {child.pendingCount > 0 && (
+                                        <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none">
+                                            {child.pendingCount}
+                                        </span>
+                                    )}
                                 </button>
                             ))}
                         </div>
